@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReqWeaver — Requirement Document Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    body { background: #0b0b12; overflow-x: hidden; }
+
+    /* ─── Scrollbar ─── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #171720; }
+    ::-webkit-scrollbar-thumb { background: #2d2d44; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3d3d5c; }
+
+    /* ─── Step transitions ─── */
+    .step-panel { display: none; animation: fadeIn .3s ease; }
+    .step-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ─── Sidebar nav items ─── */
+    .step-nav { cursor: pointer; transition: all .2s; }
+    .step-nav:hover { background: rgba(124,58,237,.08); }
+    .step-nav.active { background: rgba(124,58,237,.15); border-color: #7c3aed; }
+    .step-nav.completed .step-num { background: #22c55e; border-color: #22c55e; }
+
+    /* ─── Tag input ─── */
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: .8rem; font-weight: 500; }
+    .tag-purple { background: rgba(124,58,237,.15); color: #a78bfa; border: 1px solid rgba(124,58,237,.3); }
+    .tag-green { background: rgba(34,197,94,.12); color: #4ade80; border: 1px solid rgba(34,197,94,.25); }
+    .tag-blue { background: rgba(96,165,250,.12); color: #60a5fa; border: 1px solid rgba(96,165,250,.25); }
+    .tag-amber { background: rgba(251,191,36,.12); color: #fbbf24; border: 1px solid rgba(251,191,36,.25); }
+    .tag-red { background: rgba(239,68,68,.12); color: #f87171; border: 1px solid rgba(239,68,68,.25); }
+
+    /* ─── Cards ─── */
+    .card-item { background: #171720; border: 1px solid #24243a; border-radius: 10px; padding: 14px; transition: all .2s; }
+    .card-item:hover { border-color: #7c3aed44; }
+    .card-item .remove-btn { opacity: 0; transition: opacity .2s; }
+    .card-item:hover .remove-btn { opacity: 1; }
+
+    /* ─── Animated Pulse ─── */
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+
+    /* ─── Empty State ─── */
+    .empty-state { text-align: center; padding: 40px 20px; color: #6b6b8a; }
+    .empty-state i { font-size: 2.5rem; margin-bottom: 12px; opacity: .5; }
+
+    /* ─── Notification Toast ─── */
+    .toast { position: fixed; bottom: 24px; right: 24px; z-index: 1000; padding: 14px 20px; border-radius: 10px; font-size: .9rem; font-weight: 500; max-width: 400px; transform: translateY(120px); opacity: 0; transition: all .4s cubic-bezier(.34,1.56,.64,1); }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast-success { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
+    .toast-error { background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
+    .toast-info { background: #172554; color: #93c5fd; border: 1px solid #1e3a8a; }
+
+    /* ─── Loading spinner ─── */
+    .spinner { width: 20px; height: 20px; border: 2px solid #24243a; border-top-color: #7c3aed; border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── For markdown preview ─── */
+    .markdown-body { line-height: 1.7; }
+    .markdown-body h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 12px; color: #e2e2f0; }
+    .markdown-body h2 { font-size: 1.2rem; font-weight: 600; margin: 20px 0 8px; color: #a78bfa; }
+    .markdown-body h3 { font-size: 1.05rem; font-weight: 600; margin: 16px 0 6px; color: #c4b5fd; }
+    .markdown-body p { margin-bottom: 8px; color: #b0b0c8; }
+    .markdown-body table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: .85rem; }
+    .markdown-body th, .markdown-body td { padding: 8px 12px; border: 1px solid #24243a; text-align: left; }
+    .markdown-body th { background: #1a1a28; color: #a78bfa; font-weight: 600; }
+    .markdown-body td { color: #b0b0c8; }
+    .markdown-body hr { border: none; border-top: 1px solid #24243a; margin: 20px 0; }
+    .markdown-body code { background: #1a1a28; padding: 2px 6px; border-radius: 4px; font-size: .8rem; color: #fbbf24; }
+    .markdown-body pre { background: #1a1a28; padding: 14px; border-radius: 8px; overflow-x: auto; margin: 12px 0; border: 1px solid #24243a; }
+    .markdown-body pre code { background: none; padding: 0; color: inherit; }
+    .markdown-body ul, .markdown-body ol { padding-left: 20px; margin: 8px 0; color: #b0b0c8; }
+    .markdown-body li { margin-bottom: 4px; }
+    .markdown-body blockquote { border-left: 3px solid #7c3aed; padding-left: 14px; color: #8a8aaa; margin: 12px 0; font-style: italic; }
+
+    /* ─── Modal backdrop ─── */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); z-index: 900; display: none; }
+    .modal-backdrop.show { display: block; }
+    .modal-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 950; background: #171720; border: 1px solid #24243a; border-radius: 16px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; display: none; }
+    .modal-panel.show { display: block; }
+  </style>
+</head>
+<body class="text-gray-200 min-h-screen">
+
+<div id="app" v-cloak>
+
+<!-- ─── TOAST ─── -->
+<div id="toast" class="toast"></div>
+
+<!-- ─── MODAL ─── -->
+<div id="modalBackdrop" class="modal-backdrop" onclick="closeModal()"></div>
+<div id="modalPanel" class="modal-panel p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h3 id="modalTitle" class="text-lg font-bold"></h3>
+    <button onclick="closeModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+  </div>
+  <div id="modalBody"></div>
+</div>
+
+<!-- ─── HEADER ─── -->
+<header class="sticky top-0 z-50 bg-[#0b0b12]/90 backdrop-blur-lg border-b border-[#24243a]">
+  <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-2xl">📋</span>
+      <span class="font-bold text-lg bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">ReqWeaver</span>
+      <span class="hidden sm:inline text-xs text-gray-500 bg-[#171720] px-2 py-1 rounded-full">v1.0</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="btnNewProject" class="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-lg transition-all">
+        <i class="fas fa-plus text-xs"></i> New Project
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ─── MAIN LAYOUT ─── -->
+<div class="max-w-7xl mx-auto px-4 py-6 flex gap-6">
+
+  <!-- ─── SIDEBAR ─── -->
+  <aside id="sidebar" class="hidden md:block w-64 shrink-0">
+    <!-- Project List -->
+    <div id="projectListPanel">
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Recent Projects</h2>
+      <div id="projectList" class="space-y-2">
+        <div class="text-center py-8 text-gray-600 text-sm">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Step Navigation (shown when project selected) -->
+    <div id="stepNavPanel" class="hidden">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500">Workflow</h2>
+        <span id="currentProjectName" class="text-xs text-purple-400 truncate max-w-[140px]"></span>
+      </div>
+      <div class="space-y-1">
+        <div class="step-nav active px-3 py-2 rounded-lg border border-transparent flex items-center gap-2 text-xs" data-step="0">
+          <span class="step-num w-5 h-5 flex items-center justify-center rounded-full bg-purple-600 text-white text-[10px] font-bold">1</span>
+          <span>Project Info</span>
+        </div>
+        <div class="step-nav px-3 py-2 rounded-lg border border-transparent flex items-center gap-2 text-xs" data-step="1">
+          <span class="step-num w-5 h-5 flex items-center justify-center rounded-full bg-[#24243a] text-gray-400 text-[10px] font-bold">2</span>
+          <span>Stakeholders</span>
+        </div>
+        <div class="step-nav px-3 py-2 rounded-lg border border-transparent flex items-center gap-2 text-xs" data-step="2">
+          <span class="step-num w-5 h-5 flex items-center justify-center rounded-full bg-[#24243a] text-gray-400 text-[10px] font-bold">3</span>
+          <span>Target Users</span>
+        </div>
+        <div class="step-nav px-3 py-2 rounded-lg border border-transparent flex items-center gap-2 text-xs" data-step="3">
+          <span class="step-num w-5 h-5 flex items-center justify-center rounded-full bg-[#24243a] text-gray-400 text-[10px] font-bold">4</span>
+          <span>Features</span>
+        </div>
+        <div class="step-nav px-3 py-2 rounded-lg border border-transparent flex items-center gap-2 text-xs" data-step="4">
+          <span class="step-num w-5 h-5 flex items-center justify-center rounded-full bg-[#24243a] text-gray-400 text-[10px] font-bold">5</span>
+          <span>Functional Reqs</span>
+        </div>
+        <div class="step-nav px-3 py-2 rounded-lg border border-transparent flex items-center gap-2 text-xs" data-step="5">
+          <span class="step-num w-5 h-5 flex items-center justify-center rounded-full bg-[#24243a] text-gray-400 text-[10px] font-bold">6</span>
+          <span>Non-Functional Reqs</span>
+        </div>
+        <div class="step-nav px-3 py-2 rounded-lg border border-transparent flex items-center gap-2 text-xs" data-step="6">
+          <span class="step-num w-5 h-5 flex items-center justify-center rounded-full bg-[#24243a] text-gray-400 text-[10px] font-bold">7</span>
+          <span>Data Model</span>
+        </div>
+        <div class="step-nav px-3 py-2 rounded-lg border border-transparent flex items-center gap-2 text-xs" data-step="7">
+          <span class="step-num w-5 h-5 flex items-center justify-center rounded-full bg-[#24243a] text-gray-400 text-[10px] font-bold">8</span>
+          <span>System Interactions</span>
+        </div>
+        <div class="step-nav px-3 py-2 rounded-lg border border-transparent flex items-center gap-2 text-xs" data-step="8">
+          <span class="step-num w-5 h-5 flex items-center justify-center rounded-full bg-[#24243a] text-gray-400 text-[10px] font-bold">9</span>
+          <span>Review & Generate</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─── CONTENT ─── -->
+  <main class="flex-1 min-w-0">
+
+    <!-- ===== WELCOME / PROJECT LIST ===== -->
+    <div id="welcomePanel">
+      <div class="text-center py-12">
+        <span class="text-5xl mb-4 block">📋</span>
+        <h1 class="text-2xl font-bold mb-2">ReqWeaver</h1>
+        <p class="text-gray-500 mb-8 max-w-lg mx-auto">Interactive Requirement Document Generator. Mulai dengan membuat project baru atau pilih project yang sudah ada.</p>
+        <button onclick="createNewProject()" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all inline-flex items-center gap-2">
+          <i class="fas fa-plus"></i> Buat Project Baru
+        </button>
+      </div>
+
+      <div id="welcomeProjectList" class="max-w-2xl mx-auto space-y-3 mt-4">
+        <h3 class="text-sm font-semibold text-gray-500 px-1">Recent Projects</h3>
+      </div>
+    </div>
+
+    <!-- ===== STEP FORM ===== -->
+    <div id="formPanel" class="hidden">
+      <!-- Progress bar -->
+      <div class="flex items-center gap-2 mb-6">
+        <div id="progressBar" class="flex-1 h-1.5 bg-[#24243a] rounded-full overflow-hidden">
+          <div id="progressFill" class="h-full bg-gradient-to-r from-purple-600 to-blue-500 rounded-full transition-all duration-500" style="width:0%"></div>
+        </div>
+        <span id="stepCounter" class="text-xs text-gray-500 shrink-0">0/9</span>
+      </div>
+
+      <!-- STEP 0: Project Info -->
+      <div class="step-panel active" data-step="0">
+        <h2 class="text-xl font-bold mb-1">Informasi Project</h2>
+        <p class="text-sm text-gray-500 mb-6">Masukkan informasi dasar tentang project yang akan dikerjakan.</p>
+        <div class="space-y-4 max-w-2xl">
+          <div>
+            <label class="block text-sm font-medium mb-1">Nama Project <span class="text-red-400">*</span></label>
+            <input id="f_name" class="w-full px-4 py-2.5 bg-[#171720] border border-[#24243a] rounded-lg focus:outline-none focus:border-purple-500 text-sm" placeholder="e.g. Sistem Manajemen Inventaris">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Deskripsi</label>
+            <textarea id="f_description" rows="3" class="w-full px-4 py-2.5 bg-[#171720] border border-[#24243a] rounded-lg focus:outline-none focus:border-purple-500 text-sm" placeholder="Jelaskan secara singkat tentang project ini"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Tujuan / Goals</label>
+            <textarea id="f_goals" rows="3" class="w-full px-4 py-2.5 bg-[#171720] border border-[#24243a] rounded-lg focus:outline-none focus:border-purple-500 text-sm" placeholder="Apa tujuan utama dari project ini? (satu per baris)"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Business Context</label>
+            <textarea id="f_business" rows="2" class="w-full px-4 py-2.5 bg-[#171720] border border-[#24243a] rounded-lg focus:outline-none focus:border-purple-500 text-sm" placeholder="Latar belakang bisnis / masalah yang ingin diselesaikan"></textarea>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">Success Metrics</label>
+              <textarea id="f_metrics" rows="2" class="w-full px-4 py-2.5 bg-[#171720] border border-[#24243a] rounded-lg focus:outline-none focus:border-purple-500 text-sm" placeholder="Bagaimana mengukur kesuksesan?"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Constraints</label>
+              <textarea id="f_constraints" rows="2" class="w-full px-4 py-2.5 bg-[#171720] border border-[#24243a] rounded-lg focus:outline-none focus:border-purple-500 text-sm" placeholder="Budget, timeline, regulasi, dll"></textarea>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Tech Stack</label>
+            <input id="f_tech" class="w-full px-4 py-2.5 bg-[#171720] border border-[#24243a] rounded-lg focus:outline-none focus:border-purple-500 text-sm" placeholder="e.g. Next.js + PostgreSQL + Tailwind">
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 1: Stakeholders -->
+      <div class="step-panel" data-step="1">
+        <h2 class="text-xl font-bold mb-1">Stakeholders</h2>
+        <p class="text-sm text-gray-500 mb-6">Siapa saja yang terlibat atau memiliki kepentingan dalam project ini?</p>
+        <div id="stakeholderList" class="space-y-3 mb-4 max-w-2xl"></div>
+        <button onclick="addStakeholder()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+          <i class="fas fa-plus"></i> Tambah Stakeholder
+        </button>
+      </div>
+
+      <!-- STEP 2: Target Users -->
+      <div class="step-panel" data-step="2">
+        <h2 class="text-xl font-bold mb-1">Target Users</h2>
+        <p class="text-sm text-gray-500 mb-6">Siapa yang akan menggunakan sistem ini? Definisikan persona pengguna.</p>
+        <div id="userList" class="space-y-3 mb-4 max-w-2xl"></div>
+        <button onclick="addTargetUser()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+          <i class="fas fa-plus"></i> Tambah User Persona
+        </button>
+      </div>
+
+      <!-- STEP 3: Features -->
+      <div class="step-panel" data-step="3">
+        <h2 class="text-xl font-bold mb-1">Core Features</h2>
+        <p class="text-sm text-gray-500 mb-6">Fitur-fitur utama yang akan dibangun. Prioritaskan dengan MoSCoW method.</p>
+        <div id="featureList" class="space-y-3 mb-4 max-w-2xl"></div>
+        <button onclick="addFeature()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+          <i class="fas fa-plus"></i> Tambah Fitur
+        </button>
+      </div>
+
+      <!-- STEP 4: Functional Requirements -->
+      <div class="step-panel" data-step="4">
+        <h2 class="text-xl font-bold mb-1">Functional Requirements</h2>
+        <p class="text-sm text-gray-500 mb-6">Persyaratan fungsional yang spesifik — apa yang sistem harus lakukan.</p>
+        <div id="funcReqList" class="space-y-3 mb-4 max-w-2xl"></div>
+        <button onclick="addFuncReq()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+          <i class="fas fa-plus"></i> Tambah Functional Requirement
+        </button>
+      </div>
+
+      <!-- STEP 5: Non-Functional Requirements -->
+      <div class="step-panel" data-step="5">
+        <h2 class="text-xl font-bold mb-1">Non-Functional Requirements</h2>
+        <p class="text-sm text-gray-500 mb-6">Persyaratan kualitas — performance, security, usability, dll.</p>
+        <div id="nfrList" class="space-y-3 mb-4 max-w-2xl"></div>
+        <button onclick="addNFR()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+          <i class="fas fa-plus"></i> Tambah NFR
+        </button>
+      </div>
+
+      <!-- STEP 6: Data Model -->
+      <div class="step-panel" data-step="6">
+        <h2 class="text-xl font-bold mb-1">Data Model</h2>
+        <p class="text-sm text-gray-500 mb-6">Definisikan entity, atribut, dan hubungan antar data dalam sistem.</p>
+        <div id="entityList" class="space-y-3 mb-4 max-w-2xl"></div>
+        <button onclick="addEntity()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+          <i class="fas fa-plus"></i> Tambah Entity
+        </button>
+        <div class="mt-6">
+          <h3 class="text-sm font-semibold mb-3 text-gray-400">Entity Relationships</h3>
+          <div id="relList" class="space-y-3 mb-3 max-w-2xl"></div>
+          <button onclick="addRelationship()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+            <i class="fas fa-plus"></i> Tambah Relationship
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 7: System Interactions -->
+      <div class="step-panel" data-step="7">
+        <h2 class="text-xl font-bold mb-1">System Interactions</h2>
+        <p class="text-sm text-gray-500 mb-6">Definisikan sequence flow — siapa melakukan apa, dalam urutan apa.</p>
+        <div id="flowList" class="space-y-3 mb-4 max-w-2xl"></div>
+        <button onclick="addSequenceFlow()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+          <i class="fas fa-plus"></i> Tambah Sequence Flow
+        </button>
+      </div>
+
+      <!-- STEP 8: Review & Generate -->
+      <div class="step-panel" data-step="8">
+        <h2 class="text-xl font-bold mb-1">Review & Generate</h2>
+        <p class="text-sm text-gray-500 mb-6">Review data yang sudah dikumpulkan, lalu generate dokumen.</p>
+        
+        <!-- Summary -->
+        <div id="reviewSummary" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
+          <div class="card-item text-center py-6"><div class="text-2xl font-bold text-purple-400" id="r_stakeholders">0</div><div class="text-xs text-gray-500 mt-1">Stakeholders</div></div>
+          <div class="card-item text-center py-6"><div class="text-2xl font-bold text-blue-400" id="r_users">0</div><div class="text-xs text-gray-500 mt-1">Target Users</div></div>
+          <div class="card-item text-center py-6"><div class="text-2xl font-bold text-green-400" id="r_features">0</div><div class="text-xs text-gray-500 mt-1">Features</div></div>
+          <div class="card-item text-center py-6"><div class="text-2xl font-bold text-amber-400" id="r_funcreqs">0</div><div class="text-xs text-gray-500 mt-1">Func. Reqs</div></div>
+          <div class="card-item text-center py-6"><div class="text-2xl font-bold text-pink-400" id="r_entities">0</div><div class="text-xs text-gray-500 mt-1">Entities</div></div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap gap-3 mt-4">
+          <button onclick="saveAndGenerate()" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
+            <i class="fas fa-save"></i> Save & Generate All
+          </button>
+          <button onclick="downloadAll()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
+            <i class="fas fa-file-archive"></i> Download All (ZIP)
+          </button>
+        </div>
+
+        <!-- Generated docs preview -->
+        <div id="generatedDocs" class="hidden mt-8">
+          <h3 class="text-sm font-semibold text-gray-400 mb-3">Generated Documents</h3>
+          <div id="docList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="flex items-center justify-between mt-8 pt-6 border-t border-[#24243a]">
+        <button id="btnPrev" onclick="prevStep()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] hover:bg-[#1f1f30] rounded-lg text-sm transition-all">
+          <i class="fas fa-arrow-left text-xs"></i> Previous
+        </button>
+        <button id="btnNext" onclick="nextStep()" class="flex items-center gap-2 px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg text-sm transition-all">
+          Next <i class="fas fa-arrow-right text-xs"></i>
+        </button>
+      </div>
+    </div>
+
+  </main>
+</div>
+</div>
+
+<script>
+// ─── STATE ──────────────────────────────────────────────
+const state = {
+  currentStep: 0,
+  totalSteps: 9,
+  projectId: null,
+  editing: false,
+  projectData: {
+    name: '',
+    description: '',
+    goals: '',
+    business_context: '',
+    success_metrics: '',
+    constraints: '',
+    tech_stack: '',
+    stakeholders: [],
+    target_users: [],
+    features: [],
+    functional_reqs: [],
+    non_functional_reqs: [],
+    entities: [],
+    relationships: [],
+    sequence_flows: [],
+  },
+  generated: {},
+};
+
+// ─── DOM REFS ──────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const toast = $('toast');
+
+// ─── NOTIFICATION ──────────────────────────────────────
+function showToast(msg, type = 'success') {
+  toast.textContent = msg;
+  toast.className = `toast toast-${type} show`;
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+// ─── LOAD PROJECTS ─────────────────────────────────────
+async function loadProjects() {
+  try {
+    const res = await fetch('/api/projects');
+    const projects = await res.json();
+    renderProjectList(projects);
+  } catch (e) {
+    console.error('Failed to load projects', e);
+  }
+}
+
+function renderProjectList(projects) {
+  const list = $('projectList');
+  const welcome = $('welcomeProjectList');
+  
+  if (!projects.length) {
+    list.innerHTML = '<div class="text-center py-8 text-gray-600 text-sm">Belum ada project. Buat yang pertama!</div>';
+    welcome.innerHTML = '<div class="text-center py-6 text-gray-600 text-sm">Belum ada project.</div>';
+    return;
+  }
+
+  const sideHtml = projects.map(p => `
+    <div class="cursor-pointer p-3 rounded-lg border border-[#24243a] hover:border-purple-500/40 transition-all bg-[#171720]" onclick="openProject('${p.id}')">
+      <div class="font-semibold text-sm truncate">${escapeHtml(p.name)}</div>
+      <div class="text-xs text-gray-500 mt-1">${p.stats.features} features · ${p.stats.functional_reqs} reqs</div>
+    </div>
+  `).join('');
+
+  const welcomeHtml = projects.map(p => `
+    <div class="cursor-pointer p-4 rounded-lg border border-[#24243a] hover:border-purple-500/40 transition-all bg-[#171720] flex items-center justify-between" onclick="openProject('${p.id}')">
+      <div>
+        <div class="font-semibold">${escapeHtml(p.name)}</div>
+        <div class="text-xs text-gray-500 mt-0.5">${escapeHtml(p.description || 'No description')}</div>
+      </div>
+      <span class="text-xs text-gray-600">${new Date(p.updated_at).toLocaleDateString()}</span>
+    </div>
+  `).join('');
+
+  list.innerHTML = sideHtml;
+  welcome.innerHTML = '<h3 class="text-sm font-semibold text-gray-500 px-1 mb-3">Recent Projects</h3>' + welcomeHtml;
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text || '';
+  return d.innerHTML;
+}
+
+// ─── CREATE / OPEN PROJECT ────────────────────────────
+function createNewProject() {
+  state.projectId = null;
+  state.editing = false;
+  resetForm();
+  showForm();
+}
+
+function resetForm() {
+  state.projectData = {
+    name: '', description: '', goals: '', business_context: '', success_metrics: '', constraints: '', tech_stack: '',
+    stakeholders: [], target_users: [], features: [], functional_reqs: [], non_functional_reqs: [],
+    entities: [], relationships: [], sequence_flows: [],
+  };
+  state.generated = {};
+  state.currentStep = 0;
+  renderAll();
+  goToStep(0);
+}
+
+async function openProject(id) {
+  try {
+    const res = await fetch(`/api/projects/${id}`);
+    const p = await res.json();
+    state.projectId = id;
+    state.editing = true;
+    
+    state.projectData = {
+      name: p.name || '',
+      description: p.description || '',
+      goals: p.goals || '',
+      business_context: p.business_context || '',
+      success_metrics: p.success_metrics || '',
+      constraints: p.constraints || '',
+      tech_stack: p.tech_stack || '',
+      stakeholders: p.stakeholders || [],
+      target_users: p.target_users || [],
+      features: p.features || [],
+      functional_reqs: p.functional_reqs || [],
+      non_functional_reqs: p.non_functional_reqs || [],
+      entities: p.entities || [],
+      relationships: p.relationships || [],
+      sequence_flows: p.sequence_flows || [],
+    };
+    
+    state.generated = {};
+    state.currentStep = 0;
+    renderAll();
+    goToStep(0);
+    showForm();
+    showToast(`Project "${p.name}" loaded`, 'info');
+  } catch (e) {
+    showToast('Failed to load project', 'error');
+  }
+}
+
+function showForm() {
+  $('welcomePanel').classList.add('hidden');
+  $('formPanel').classList.remove('hidden');
+  $('stepNavPanel').classList.remove('hidden');
+  $('currentProjectName').textContent = state.projectData.name || 'New Project';
+}
+
+// ─── STEP NAVIGATION ────────────────────────────────────
+function goToStep(n) {
+  state.currentStep = Math.max(0, Math.min(n, state.totalSteps - 1));
+  
+  // Panels
+  document.querySelectorAll('.step-panel').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.step-panel[data-step="${state.currentStep}"]`).classList.add('active');
+  
+  // Nav
+  document.querySelectorAll('.step-nav').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.step-nav[data-step="${state.currentStep}"]`)?.classList.add('active');
+  
+  // Progress
+  const pct = ((state.currentStep) / (state.totalSteps - 1)) * 100;
+  $('progressFill').style.width = pct + '%';
+  $('stepCounter').textContent = `${state.currentStep + 1}/${state.totalSteps}`;
+  
+  // Buttons
+  $('btnPrev').style.visibility = state.currentStep === 0 ? 'hidden' : 'visible';
+  $('btnNext').textContent = state.currentStep === state.totalSteps - 1 ? '✨ Finish' : 'Next →';
+  
+  // If on last step, update review
+  if (state.currentStep === state.totalSteps - 1) {
+    updateReview();
+  }
+  
+  updateSidebarCompleted();
+}
+
+function nextStep() {
+  if (state.currentStep < state.totalSteps - 1) {
+    goToStep(state.currentStep + 1);
+  } else {
+    // On finish, scroll to generate section
+    $('btnNext').scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+function prevStep() {
+  if (state.currentStep > 0) goToStep(state.currentStep - 1);
+}
+
+// Sidebar click
+document.querySelectorAll('.step-nav').forEach(el => {
+  el.addEventListener('click', () => goToStep(parseInt(el.dataset.step)));
+});
+
+function updateSidebarCompleted() {
+  document.querySelectorAll('.step-nav').forEach(el => {
+    const step = parseInt(el.dataset.step);
+    if (step < state.currentStep) {
+      el.classList.add('completed');
+    } else {
+      el.classList.remove('completed');
+    }
+  });
+}
+
+// ─── RENDER ALL DYNAMIC FORMS ──────────────────────────
+function renderAll() {
+  renderStakeholders();
+  renderTargetUsers();
+  renderFeatures();
+  renderFuncReqs();
+  renderNFRs();
+  renderEntities();
+  renderRelationships();
+  renderFlows();
+  updateProjectInfoFields();
+  $('currentProjectName').textContent = state.projectData.name || 'New Project';
+}
+
+function updateProjectInfoFields() {
+  $('f_name').value = state.projectData.name || '';
+  $('f_description').value = state.projectData.description || '';
+  $('f_goals').value = state.projectData.goals || '';
+  $('f_business').value = state.projectData.business_context || '';
+  $('f_metrics').value = state.projectData.success_metrics || '';
+  $('f_constraints').value = state.projectData.constraints || '';
+  $('f_tech').value = state.projectData.tech_stack || '';
+}
+
+// Sync form fields back to state
+function syncProjectInfo() {
+  state.projectData.name = $('f_name').value.trim();
+  state.projectData.description = $('f_description').value.trim();
+  state.projectData.goals = $('f_goals').value.trim();
+  state.projectData.business_context = $('f_business').value.trim();
+  state.projectData.success_metrics = $('f_metrics').value.trim();
+  state.projectData.constraints = $('f_constraints').value.trim();
+  state.projectData.tech_stack = $('f_tech').value.trim();
+  $('currentProjectName').textContent = state.projectData.name || 'New Project';
+}
+
+// Auto-sync on input
+document.querySelectorAll('#f_name, #f_description, #f_goals, #f_business, #f_metrics, #f_constraints, #f_tech').forEach(el => {
+  el.addEventListener('input', syncProjectInfo);
+});
+
+// ─── STAKEHOLDERS ───────────────────────────────────────
+function renderStakeholders() {
+  const list = $('stakeholderList');
+  if (!state.projectData.stakeholders.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>Belum ada stakeholder. Tambah stakeholder pertama.</p></div>';
+    return;
+  }
+  list.innerHTML = state.projectData.stakeholders.map((s, i) => `
+    <div class="card-item">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input value="${escapeHtml(s.name)}" onchange="updateStakeholder(${i},'name',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm" placeholder="Nama">
+          <input value="${escapeHtml(s.role)}" onchange="updateStakeholder(${i},'role',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm" placeholder="Role / Jabatan">
+          <input value="${escapeHtml(s.email)}" onchange="updateStakeholder(${i},'email',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm" placeholder="Email">
+          <div class="flex gap-2">
+            <select onchange="updateStakeholder(${i},'influence',this.value)" class="flex-1 px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm">
+              ${['low','medium','high'].map(v => `<option value="${v}" ${s.influence === v ? 'selected' : ''}>${v} influence</option>`).join('')}
+            </select>
+            <select onchange="updateStakeholder(${i},'interest',this.value)" class="flex-1 px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm">
+              ${['low','medium','high'].map(v => `<option value="${v}" ${s.interest === v ? 'selected' : ''}>${v} interest</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <button onclick="removeStakeholder(${i})" class="remove-btn text-red-400 hover:text-red-300 p-1"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addStakeholder() {
+  state.projectData.stakeholders.push({ name: '', role: '', email: '', influence: 'medium', interest: 'medium' });
+  renderStakeholders();
+}
+function updateStakeholder(i, field, value) {
+  state.projectData.stakeholders[i][field] = value;
+}
+function removeStakeholder(i) {
+  state.projectData.stakeholders.splice(i, 1);
+  renderStakeholders();
+}
+
+// ─── TARGET USERS ───────────────────────────────────────
+function renderTargetUsers() {
+  const list = $('userList');
+  if (!state.projectData.target_users.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-user-tag"></i><p>Belum ada user persona.</p></div>';
+    return;
+  }
+  list.innerHTML = state.projectData.target_users.map((u, i) => `
+    <div class="card-item">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input value="${escapeHtml(u.persona_name)}" onchange="updateUser(${i},'persona_name',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm" placeholder="Nama Persona">
+          <textarea onchange="updateUser(${i},'description',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm col-span-2" rows="2" placeholder="Deskripsi">${escapeHtml(u.description)}</textarea>
+          <textarea onchange="updateUser(${i},'pain_points',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm col-span-3" rows="2" placeholder="Pain points / masalah yang dihadapi">${escapeHtml(u.pain_points)}</textarea>
+        </div>
+        <button onclick="removeUser(${i})" class="remove-btn text-red-400 hover:text-red-300 p-1"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addTargetUser() {
+  state.projectData.target_users.push({ persona_name: '', description: '', pain_points: '' });
+  renderTargetUsers();
+}
+function updateUser(i, field, value) {
+  state.projectData.target_users[i][field] = value;
+}
+function removeUser(i) {
+  state.projectData.target_users.splice(i, 1);
+  renderTargetUsers();
+}
+
+// ─── FEATURES ───────────────────────────────────────────
+function renderFeatures() {
+  const list = $('featureList');
+  if (!state.projectData.features.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-star"></i><p>Belum ada fitur.</p></div>';
+    return;
+  }
+  list.innerHTML = state.projectData.features.map((f, i) => `
+    <div class="card-item">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <input value="${escapeHtml(f.name)}" onchange="updateFeature(${i},'name',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm sm:col-span-2" placeholder="Nama Fitur">
+          <select onchange="updateFeature(${i},'priority',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm">
+            ${['must','should','could','wont'].map(v => `<option value="${v}" ${f.priority === v ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
+          <span class="px-2 py-1 text-[10px] font-bold uppercase ${f.priority === 'must' ? 'text-red-400' : f.priority === 'should' ? 'text-amber-400' : f.priority === 'could' ? 'text-blue-400' : 'text-gray-500'}">${f.priority}</span>
+          <textarea onchange="updateFeature(${i},'description',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm col-span-4" rows="2" placeholder="Deskripsi fitur">${escapeHtml(f.description)}</textarea>
+        </div>
+        <button onclick="removeFeature(${i})" class="remove-btn text-red-400 hover:text-red-300 p-1"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addFeature() {
+  state.projectData.features.push({ name: '', description: '', priority: 'should' });
+  renderFeatures();
+}
+function updateFeature(i, field, value) {
+  state.projectData.features[i][field] = value;
+}
+function removeFeature(i) {
+  state.projectData.features.splice(i, 1);
+  renderFeatures();
+}
+
+// ─── FUNCTIONAL REQS ────────────────────────────────────
+function renderFuncReqs() {
+  const list = $('funcReqList');
+  if (!state.projectData.functional_reqs.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-list-check"></i><p>Belum ada functional requirement.</p></div>';
+    return;
+  }
+  list.innerHTML = state.projectData.functional_reqs.map((r, i) => `
+    <div class="card-item">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <input value="${escapeHtml(r.req_id || 'FR-' + String(i + 1).padStart(3,'0'))}" onchange="updateFuncReq(${i},'req_id',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm font-mono w-24" placeholder="FR-001">
+          <input value="${escapeHtml(r.title)}" onchange="updateFuncReq(${i},'title',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm sm:col-span-3" placeholder="Title">
+          <textarea onchange="updateFuncReq(${i},'description',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm col-span-4" rows="2" placeholder="Description">${escapeHtml(r.description)}</textarea>
+          <select onchange="updateFuncReq(${i},'category',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm">
+            ${['general','auth','data','ui','integration','reporting'].map(v => `<option value="${v}" ${r.category === v ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
+          <select onchange="updateFuncReq(${i},'priority',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm">
+            ${['low','medium','high','critical'].map(v => `<option value="${v}" ${r.priority === v ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
+        </div>
+        <button onclick="removeFuncReq(${i})" class="remove-btn text-red-400 hover:text-red-300 p-1"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addFuncReq() {
+  state.projectData.functional_reqs.push({ req_id: 'FR-' + String(state.projectData.functional_reqs.length + 1).padStart(3,'0'), title: '', description: '', category: 'general', priority: 'medium' });
+  renderFuncReqs();
+}
+function updateFuncReq(i, field, value) {
+  state.projectData.functional_reqs[i][field] = value;
+}
+function removeFuncReq(i) {
+  state.projectData.functional_reqs.splice(i, 1);
+  renderFuncReqs();
+}
+
+// ─── NON-FUNCTIONAL REQS ────────────────────────────────
+function renderNFRs() {
+  const list = $('nfrList');
+  if (!state.projectData.non_functional_reqs.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-shield"></i><p>Belum ada non-functional requirement.</p></div>';
+    return;
+  }
+  list.innerHTML = state.projectData.non_functional_reqs.map((n, i) => `
+    <div class="card-item">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <select onchange="updateNFR(${i},'category',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm">
+            ${['performance','security','usability','reliability','scalability'].map(v => `<option value="${v}" ${n.category === v ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
+          <textarea onchange="updateNFR(${i},'description',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm col-span-3" rows="2" placeholder="Requirement">${escapeHtml(n.description)}</textarea>
+          <input value="${escapeHtml(n.metric)}" onchange="updateNFR(${i},'metric',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm" placeholder="Metric (e.g. <200ms)">
+          <select onchange="updateNFR(${i},'priority',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm">
+            ${['low','medium','high','critical'].map(v => `<option value="${v}" ${n.priority === v ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
+        </div>
+        <button onclick="removeNFR(${i})" class="remove-btn text-red-400 hover:text-red-300 p-1"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addNFR() {
+  state.projectData.non_functional_reqs.push({ category: 'performance', description: '', metric: '', priority: 'medium' });
+  renderNFRs();
+}
+function updateNFR(i, field, value) {
+  state.projectData.non_functional_reqs[i][field] = value;
+}
+function removeNFR(i) {
+  state.projectData.non_functional_reqs.splice(i, 1);
+  renderNFRs();
+}
+
+// ─── ENTITIES ───────────────────────────────────────────
+function renderEntities() {
+  const list = $('entityList');
+  if (!state.projectData.entities.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-database"></i><p>Belum ada entity.</p></div>';
+    return;
+  }
+  list.innerHTML = state.projectData.entities.map((e, i) => `
+    <div class="card-item">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1">
+          <div class="flex gap-3 mb-2">
+            <input value="${escapeHtml(e.name)}" onchange="updateEntity(${i},'name',this.value)" class="flex-1 px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm font-bold" placeholder="Entity Name">
+            <textarea onchange="updateEntity(${i},'description',this.value)" class="flex-1 px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm" rows="1" placeholder="Deskripsi entity">${escapeHtml(e.description)}</textarea>
+            <button onclick="removeEntity(${i})" class="remove-btn text-red-400 hover:text-red-300 p-1"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="space-y-1 pl-2 border-l-2 border-[#24243a] ml-1">
+            ${(e.attributes || []).map((a, ai) => `
+              <div class="flex items-center gap-1 text-xs">
+                <input value="${escapeHtml(a.name)}" onchange="updateEntityAttr(${i},${ai},'name',this.value)" class="px-2 py-1 bg-[#0b0b12] border border-[#24243a] rounded text-[11px] w-28 font-mono" placeholder="field_name">
+                <select onchange="updateEntityAttr(${i},${ai},'type',this.value)" class="px-2 py-1 bg-[#0b0b12] border border-[#24243a] rounded text-[11px]">
+                  ${['string','integer','float','boolean','date','datetime','uuid','json','text'].map(v => `<option value="${v}" ${a.type === v ? 'selected' : ''}>${v}</option>`).join('')}
+                </select>
+                <label class="flex items-center gap-1 px-1 cursor-pointer text-gray-400"><input type="checkbox" ${a.is_pk ? 'checked' : ''} onchange="updateEntityAttr(${i},${ai},'is_pk',this.checked)" class="w-3 h-3"> PK</label>
+                <label class="flex items-center gap-1 px-1 cursor-pointer text-gray-400"><input type="checkbox" ${a.is_fk ? 'checked' : ''} onchange="updateEntityAttr(${i},${ai},'is_fk',this.checked)" class="w-3 h-3"> FK</label>
+                <label class="flex items-center gap-1 px-1 cursor-pointer text-gray-400"><input type="checkbox" ${!a.nullable ? 'checked' : ''} onchange="updateEntityAttr(${i},${ai},'nullable',!this.checked)" class="w-3 h-3"> NOT NULL</label>
+                <button onclick="removeEntityAttr(${i},${ai})" class="text-red-400/50 hover:text-red-300 ml-auto"><i class="fas fa-times text-[10px]"></i></button>
+              </div>
+            `).join('')}
+            <button onclick="addEntityAttr(${i})" class="text-[10px] text-purple-400 hover:text-purple-300 mt-1 flex items-center gap-1"><i class="fas fa-plus"></i> Add Attribute</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addEntity() {
+  state.projectData.entities.push({ name: '', description: '', attributes: [] });
+  renderEntities();
+}
+function updateEntity(i, field, value) { state.projectData.entities[i][field] = value; }
+function removeEntity(i) { state.projectData.entities.splice(i, 1); renderEntities(); }
+function addEntityAttr(i) {
+  if (!state.projectData.entities[i].attributes) state.projectData.entities[i].attributes = [];
+  state.projectData.entities[i].attributes.push({ name: '', type: 'string', is_pk: false, is_fk: false, nullable: true, description: '' });
+  renderEntities();
+}
+function updateEntityAttr(ei, ai, field, value) { state.projectData.entities[ei].attributes[ai][field] = value; }
+function removeEntityAttr(ei, ai) { state.projectData.entities[ei].attributes.splice(ai, 1); renderEntities(); }
+
+// ─── RELATIONSHIPS ──────────────────────────────────────
+function renderRelationships() {
+  const list = $('relList');
+  if (!state.projectData.relationships.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-link"></i><p>Belum ada relationship. Tambahkan entity relationship untuk diagram ERD.</p></div>';
+    return;
+  }
+  list.innerHTML = state.projectData.relationships.map((r, i) => `
+    <div class="card-item flex items-center gap-2 flex-wrap">
+      <input value="${escapeHtml(r.source_entity)}" onchange="updateRel(${i},'source_entity',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded text-sm" placeholder="Source Entity" list="entity-list">
+      <select onchange="updateRel(${i},'relationship_type',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded text-sm">
+        ${['one-to-one','one-to-many','many-to-many'].map(v => `<option value="${v}" ${r.relationship_type === v ? 'selected' : ''}>${v}</option>`).join('')}
+      </select>
+      <input value="${escapeHtml(r.target_entity)}" onchange="updateRel(${i},'target_entity',this.value)" class="px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded text-sm" placeholder="Target Entity" list="entity-list">
+      <input value="${escapeHtml(r.description)}" onchange="updateRel(${i},'description',this.value)" class="flex-1 px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded text-sm" placeholder="Description (optional)">
+      <button onclick="removeRel(${i})" class="text-red-400 hover:text-red-300 p-1"><i class="fas fa-times"></i></button>
+    </div>
+  `).join('') + `<datalist id="entity-list">${state.projectData.entities.map(e => `<option value="${e.name}">`).join('')}</datalist>`;
+}
+
+function addRelationship() { state.projectData.relationships.push({ source_entity: '', target_entity: '', relationship_type: 'one-to-many', description: '' }); renderRelationships(); }
+function updateRel(i, field, value) { state.projectData.relationships[i][field] = value; }
+function removeRel(i) { state.projectData.relationships.splice(i, 1); renderRelationships(); }
+
+// ─── SEQUENCE FLOWS ─────────────────────────────────────
+function renderFlows() {
+  const list = $('flowList');
+  if (!state.projectData.sequence_flows.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-arrows-spin"></i><p>Belum ada sequence flow.</p></div>';
+    return;
+  }
+  list.innerHTML = state.projectData.sequence_flows.map((f, i) => `
+    <div class="card-item">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 space-y-2">
+          <div class="flex gap-3">
+            <input value="${escapeHtml(f.title)}" onchange="updateFlow(${i},'title',this.value)" class="flex-1 px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm font-semibold" placeholder="Flow Title">
+            <input value="${escapeHtml(f.actors)}" onchange="updateFlow(${i},'actors',this.value)" class="flex-1 px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm" placeholder="Actors (comma-separated, e.g. User, System, Admin)">
+          </div>
+          <textarea onchange="updateFlow(${i},'steps',this.value)" class="w-full px-3 py-2 bg-[#0b0b12] border border-[#24243a] rounded-lg text-sm font-mono" rows="4" placeholder="Steps (one per line):
+User -> System: Login Request
+System -> Database: Validate Credentials
+Database -->> System: User Data
+System --) User: Login Success">${escapeHtml(f.steps)}</textarea>
+          <p class="text-[11px] text-gray-600">Format: <code class="text-purple-400">Actor -> Target: Action</code> atau <code>-->></code> untuk response. Baris tanpa arrow jadi Note.</p>
+        </div>
+        <button onclick="removeFlow(${i})" class="remove-btn text-red-400 hover:text-red-300 p-1"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addSequenceFlow() { state.projectData.sequence_flows.push({ title: '', actors: '', steps: '' }); renderFlows(); }
+function updateFlow(i, field, value) { state.projectData.sequence_flows[i][field] = value; }
+function removeFlow(i) { state.projectData.sequence_flows.splice(i, 1); renderFlows(); }
+
+// ─── REVIEW ─────────────────────────────────────────────
+function updateReview() {
+  syncProjectInfo();
+  $('r_stakeholders').textContent = state.projectData.stakeholders.length;
+  $('r_users').textContent = state.projectData.target_users.length;
+  $('r_features').textContent = state.projectData.features.length;
+  $('r_funcreqs').textContent = state.projectData.functional_reqs.length;
+  $('r_entities').textContent = state.projectData.entities.length;
+}
+
+// ─── SAVE & GENERATE ────────────────────────────────────
+async function saveAndGenerate() {
+  syncProjectInfo();
+  
+  if (!state.projectData.name) {
+    showToast('Nama project harus diisi!', 'error');
+    goToStep(0);
+    return;
+  }
+
+  const btn = event?.target || $('btnNext');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving...';
+
+  try {
+    let projectId = state.projectId;
+    const payload = { ...state.projectData };
+
+    if (projectId && state.editing) {
+      // Save project info update
+      await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: payload.name,
+          description: payload.description,
+          goals: payload.goals,
+          business_context: payload.business_context,
+          success_metrics: payload.success_metrics,
+          constraints: payload.constraints,
+          tech_stack: payload.tech_stack,
+        }),
+      });
+      // Since we can't easily update nested items via PATCH, we recreate
+      await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+    }
+
+    // Create/recreate project
+    const res = await fetch('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to save');
+    }
+
+    const project = await res.json();
+    state.projectId = project.id;
+    state.editing = true;
+
+    // Generate documents
+    const genRes = await fetch(`/api/projects/${project.id}/generate`, { method: 'POST' });
+    const genData = await genRes.json();
+    state.generated = genData.documents || {};
+    state.projectData.name = project.name;
+
+    showToast(`✅ Project "${project.name}" saved & documents generated!`);
+    renderGeneratedDocs();
+    $('generatedDocs').classList.remove('hidden');
+    loadProjects();
+    $('currentProjectName').textContent = project.name;
+
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Save & Generate All';
+  }
+}
+
+// ─── DOCUMENT PREVIEW & DOWNLOAD ────────────────────────
+function renderGeneratedDocs() {
+  const list = $('docList');
+  const docs = [
+    { key: 'prd', label: 'PRD', icon: 'fa-file-lines', color: 'purple' },
+    { key: 'fsd', label: 'FSD', icon: 'fa-file-code', color: 'blue' },
+    { key: 'srs', label: 'SRS', icon: 'fa-file-lines', color: 'green' },
+    { key: 'erd', label: 'ERD', icon: 'fa-diagram-project', color: 'amber' },
+    { key: 'sequence', label: 'Sequence', icon: 'fa-arrows-spin', color: 'pink' },
+  ];
+
+  list.innerHTML = docs.map(d => {
+    const md = state.generated[d.key] || '';
+    const hasContent = md.length > 0;
+    return `
+      <div class="card-item ${hasContent ? 'border-purple-500/30' : ''}">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="text-${d.color}-400 text-lg"><i class="fas ${d.icon}"></i></span>
+          <div class="flex-1">
+            <div class="font-semibold text-sm">${d.label}</div>
+            <div class="text-xs text-gray-500">${hasContent ? (md.length/1000).toFixed(1) + ' KB' : 'Not generated'}</div>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          ${hasContent ? `
+            <button onclick="previewDoc('${d.key}')" class="flex-1 px-3 py-1.5 bg-[#0b0b12] border border-[#24243a] rounded-lg text-xs hover:border-purple-500/50 transition-all">Preview</button>
+            <button onclick="downloadDoc('${d.key}')" class="flex-1 px-3 py-1.5 bg-${d.color}-600/20 text-${d.color}-400 border border-${d.color}-600/30 rounded-lg text-xs hover:bg-${d.color}-600/30 transition-all">Download</button>
+          ` : '<span class="text-xs text-gray-600 py-1">Generate dulu</span>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function previewDoc(docType) {
+  const md = state.generated[docType];
+  if (!md) { showToast('Document not generated yet', 'error'); return; }
+
+  const docNames = { prd: 'PRD', fsd: 'FSD', srs: 'SRS', erd: 'ERD', sequence: 'Sequence Diagram' };
+  $('modalTitle').textContent = `📄 ${docNames[docType] || docType} — Preview`;
+
+  // Simple markdown to HTML rendering
+  let html = escapeHtml(md)
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/<li>.*<\/li>/gs, match => `<ol>${match}</ol>`)
+    .replace(/\|(.+)\|/g, (m) => {
+      if (m.includes('---')) return '';
+      const cells = m.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    })
+    .replace(/(<tr>.*<\/tr>\n?)+/g, '<table>$&</table>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+
+  html = `<div class="markdown-body"><p>${html}</p></div>`;
+
+  $('modalBody').innerHTML = html;
+  $('modalBackdrop').classList.add('show');
+  $('modalPanel').classList.add('show');
+}
+
+function closeModal() {
+  $('modalBackdrop').classList.remove('show');
+  $('modalPanel').classList.remove('show');
+}
+
+function downloadDoc(docType) {
+  if (!state.projectId) { showToast('Save project first', 'error'); return; }
+  window.open(`/api/projects/${state.projectId}/download/${docType}`, '_blank');
+}
+
+function downloadAll() {
+  if (!state.projectId) { showToast('Save project first', 'error'); return; }
+  window.open(`/api/projects/${state.projectId}/download-all`, '_blank');
+}
+
+// ─── INIT ───────────────────────────────────────────────
+loadProjects();
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+</script>
+</body>
+</html>

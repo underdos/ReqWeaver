@@ -1,0 +1,20 @@
+services:
+  reqweaver:
+    build: .
+    container_name: reqweaver
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8060:8060"
+    environment:
+      - DATABASE_URL=sqlite:///./data/reqweaver.db
+    volumes:
+      - reqweaver-data:/app/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8060/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  reqweaver-data:
