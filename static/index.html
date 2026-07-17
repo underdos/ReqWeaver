@@ -361,32 +361,35 @@
       </div>
 
       <!-- Action Buttons -->
-        <div class="flex flex-wrap gap-3 mt-4">
-          <button onclick="generateAll()" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
-            <i class="fas fa-robot"></i> Generate All
-          </button>
-          <button onclick="downloadAll()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
-            <i class="fas fa-file-archive"></i> Download All (ZIP)
-          </button>
-        </div>
+      <div class="flex flex-wrap gap-3 mt-4">
+        <button onclick="generateAll()" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
+          <i class="fas fa-robot"></i> Generate All
+        </button>
+        <button onclick="downloadAll()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
+          <i class="fas fa-file-archive"></i> Download All (ZIP)
+        </button>
+      </div>
 
-        <!-- Generation queue status -->
-        <div id="genQueue" class="hidden mt-6 space-y-2">
-          <h3 class="text-sm font-semibold text-gray-400">Generation Progress</h3>
-          <div id="genQueueList" class="space-y-2"></div>
-        </div>
+      <!-- Generation queue status -->
+      <div id="genQueue" class="hidden mt-6 space-y-2">
+        <h3 class="text-sm font-semibold text-gray-400">Generation Progress</h3>
+        <div id="genQueueList" class="space-y-2"></div>
+      </div>
 
-        <!-- Generated docs preview -->
-        <div id="generatedDocs" class="hidden mt-8">
-          <h3 class="text-sm font-semibold text-gray-400 mb-3">Generated Documents</h3>
-          <div id="docList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
-        </div>
+      <!-- Per-Document Cards (always visible) -->
+      <div class="mt-8">
+        <h3 class="text-sm font-semibold text-gray-400 mb-3">📄 Dokumen</h3>
+        <div id="docList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </div>
 
-        <!-- Generation History -->
-        <div id="genHistory" class="hidden mt-8">
-          <h3 class="text-sm font-semibold text-gray-400 mb-3">📜 Generation History <span id="historyDocType" class="text-xs text-gray-500 font-normal"></span></h3>
-          <div id="genHistoryList" class="space-y-2"></div>
+      <!-- History Panel (shown inline below selected doc) -->
+      <div id="genHistory" class="hidden mt-4 p-4 rounded-xl border border-[#24243a] bg-[#171720]">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-gray-300">📜 Riwayat <span id="historyDocType" class="text-xs text-gray-500 font-normal"></span></h3>
+          <button onclick="closeHistory()" class="text-xs text-gray-500 hover:text-gray-300"><i class="fas fa-times"></i></button>
         </div>
+        <div id="genHistoryList" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+      </div>
       </div>
 
       <!-- Navigation -->
@@ -571,6 +574,7 @@ function goToStep(n) {
   // If on last step, update review
   if (state.currentStep === state.totalSteps - 1) {
     updateReview();
+    renderDocList();
   }
   
   updateSidebarCompleted();
@@ -1120,8 +1124,7 @@ async function pollGeneration(genId, docType) {
         if (contentRes.ok) {
           const contentData = await contentRes.json();
           state.generated[docType].content = contentData.content || '';
-          renderGeneratedDocs();
-          $('generatedDocs').classList.remove('hidden');
+          renderDocList();
           showToast(`📄 ${docType.toUpperCase()} selesai!`, 'success');
         }
       } else if (data.status === 'failed') {
@@ -1178,72 +1181,9 @@ function updateGenQueueItem(docType, status) {
   }
 }
 
-// ─── HISTORY ────────────────────────────────────────────
+// ─── DOCUMENT LIST (always visible) ─────────────────────
 
-async function loadHistory(docType) {
-  if (!state.projectId) return;
-  try {
-    const res = await fetch(`/api/projects/${state.projectId}/generations?doc_type=${docType}&limit=20`);
-    if (!res.ok) return;
-    const gens = await res.json();
-    state.loadedGenerations[docType] = gens;
-    renderHistory(docType, gens);
-  } catch (e) {
-    console.error('Failed to load history:', e);
-  }
-}
-
-function renderHistory(docType, gens) {
-  const list = $('genHistoryList');
-  if (!gens || !gens.length) {
-    list.innerHTML = '<div class="text-xs text-gray-600">Belum ada riwayat generasi.</div>';
-    return;
-  }
-  const docNames = { prd: 'PRD', fsd: 'FSD', srs: 'SRS', erd: 'ERD', sequence: 'Sequence' };
-  $('historyDocType').textContent = `— ${docNames[docType] || docType}`;
-  $('genHistory').classList.remove('hidden');
-  
-  list.innerHTML = gens.map(g => {
-    const isLatest = state.generated[docType] && state.generated[docType].version === g.version && state.generated[docType].status === 'completed';
-    return `
-      <div class="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-[#171720] border ${isLatest ? 'border-purple-500/40' : 'border-[#24243a]'}">
-        <div class="flex-1">
-          <span class="text-sm font-medium">v${g.version}</span>
-          <span class="text-xs text-gray-500 ml-2">${g.mode}</span>
-          <span class="text-xs text-gray-500 ml-2">${g.status}</span>
-          ${g.status === 'completed' ? `<span class="text-xs text-gray-600 ml-2">${g.completed_at ? new Date(g.completed_at).toLocaleString() : ''}</span>` : ''}
-          ${g.status === 'failed' ? `<span class="text-xs text-red-400 ml-2">${g.error}</span>` : ''}
-        </div>
-        <div class="flex gap-2">
-          ${g.status === 'completed' ? `
-            <button onclick="previewVersion('${docType}', '${g.id}')" class="px-2.5 py-1 text-xs bg-[#0b0b12] border border-[#24243a] rounded hover:border-purple-500/50 transition-all">Preview</button>
-            <button onclick="downloadVersion('${g.id}')" class="px-2.5 py-1 text-xs bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded hover:bg-blue-600/30 transition-all">Download</button>
-          ` : `<span class="text-xs text-gray-600 px-2">${g.status}</span>`}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-async function previewVersion(docType, genId) {
-  try {
-    const res = await fetch(`/api/projects/${state.projectId}/generations/${genId}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    showDocPreview(docType, data.content, `v${data.version}`);
-  } catch (e) {
-    showToast('Failed to load version', 'error');
-  }
-}
-
-function downloadVersion(genId) {
-  if (!state.projectId) return;
-  window.open(`/api/projects/${state.projectId}/download/gen/${genId}`, '_blank');
-}
-
-// ─── DOCUMENT PREVIEW & DOWNLOAD ────────────────────────
-
-function renderGeneratedDocs() {
+function renderDocList() {
   const list = $('docList');
   const docs = [
     { key: 'prd', label: 'PRD', icon: 'fa-file-lines', color: 'purple' },
@@ -1264,20 +1204,20 @@ function renderGeneratedDocs() {
           <div class="flex-1">
             <div class="font-semibold text-sm">${d.label}</div>
             <div class="text-xs text-gray-500">
-              ${hasContent ? `${(gen.content.length/1000).toFixed(1)} KB` : isProcessing ? '⏳ Generating...' : '—'}
-              ${gen.version ? `v${gen.version}` : ''}
+              ${hasContent ? `${(gen.content.length/1000).toFixed(1)} KB` : isProcessing ? '⏳ Generating...' : 'Belum digenerate'}
+              ${gen.version ? ` · v${gen.version}` : ''}
             </div>
           </div>
         </div>
         <div class="flex gap-2 flex-wrap">
           <button data-genbtn="${d.key}" onclick="generateDoc('${d.key}')" class="flex-1 px-3 py-1.5 bg-purple-600/20 text-purple-400 border border-purple-600/30 rounded-lg text-xs hover:bg-purple-600/30 transition-all">
-            ${isProcessing ? '<span class="spinner"></span>' : hasContent ? '🔄 Re-generate' : '🤖 Generate'}
+            ${isProcessing ? '<span class="spinner"></span>' : hasContent ? '🔄 Generate Ulang' : '🤖 Generate'}
           </button>
           ${hasContent ? `
-            <button onclick="previewDoc('${d.key}')" class="px-3 py-1.5 bg-[#0b0b12] border border-[#24243a] rounded-lg text-xs hover:border-purple-500/50 transition-all">Preview</button>
-            <button onclick="downloadLatest('${d.key}')" class="px-3 py-1.5 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-lg text-xs hover:bg-blue-600/30 transition-all">Download</button>
-            <button onclick="loadHistory('${d.key}')" class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition-all" title="Lihat riwayat versi"><i class="fas fa-clock-rotate"></i></button>
+            <button onclick="previewDoc('${d.key}')" class="px-3 py-1.5 bg-[#0b0b12] border border-[#24243a] rounded-lg text-xs hover:border-purple-500/50 transition-all" title="Preview">Preview</button>
+            <button onclick="downloadVersion('${gen.generation_id}')" class="px-3 py-1.5 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-lg text-xs hover:bg-blue-600/30 transition-all" title="Download">Download</button>
           ` : ''}
+          <button onclick="loadHistory('${d.key}')" class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 border border-transparent hover:border-gray-600 rounded-lg transition-all" title="Riwayat versi"><i class="fas fa-clock-rotate"></i> Riwayat</button>
         </div>
       </div>
     `;
@@ -1327,9 +1267,9 @@ function closeModal() {
   $('modalPanel').classList.remove('show');
 }
 
-function downloadLatest(docType) {
-  if (!state.projectId) { showToast('Save project first', 'error'); return; }
-  window.open(`/api/projects/${state.projectId}/download/${docType}`, '_blank');
+function downloadVersion(genId) {
+  if (!state.projectId) return;
+  window.open(`/api/projects/${state.projectId}/download/gen/${genId}`, '_blank');
 }
 
 function downloadAll() {
@@ -1337,13 +1277,71 @@ function downloadAll() {
   window.open(`/api/projects/${state.projectId}/download-all`, '_blank');
 }
 
-// ─── INIT ───────────────────────────────────────────────
-loadProjects();
-checkAiStatus();
+// ─── GENERATION HISTORY (per-document, inline) ─────────
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeModal();
-});
+async function loadHistory(docType) {
+  if (!state.projectId) {
+    showToast('Simpan project dulu', 'error');
+    return;
+  }
+  try {
+    const res = await fetch(`/api/projects/${state.projectId}/generations?doc_type=${docType}&limit=20`);
+    if (!res.ok) return;
+    const gens = await res.json();
+    renderHistory(docType, gens);
+  } catch (e) {
+    console.error('Failed to load history:', e);
+  }
+}
+
+function renderHistory(docType, gens) {
+  const list = $('genHistoryList');
+  const docNames = { prd: 'PRD', fsd: 'FSD', srs: 'SRS', erd: 'ERD', sequence: 'Sequence' };
+  $('historyDocType').textContent = `${docNames[docType] || docType}`;
+  $('genHistory').classList.remove('hidden');
+  
+  if (!gens || !gens.length) {
+    list.innerHTML = '<div class="text-xs text-gray-500 py-2">Belum ada riwayat generasi untuk dokumen ini.</div>';
+    return;
+  }
+  
+  list.innerHTML = gens.map(g => {
+    const isLatest = state.generated[docType] && state.generated[docType].generation_id === g.id && state.generated[docType].status === 'completed';
+    return `
+      <div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#0b0b12] border ${isLatest ? 'border-purple-500/40' : 'border-[#24243a]'}">
+        <div class="flex-1 flex items-center gap-2">
+          <span class="text-sm font-medium">v${g.version}</span>
+          <span class="text-[11px] ${g.status === 'completed' ? 'text-green-500' : g.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}">${g.status}</span>
+          ${g.mode ? `<span class="text-[11px] text-gray-500">${g.mode}</span>` : ''}
+          ${g.status === 'completed' && g.completed_at ? `<span class="text-[11px] text-gray-600">${new Date(g.completed_at).toLocaleString('id-ID')}</span>` : ''}
+          ${g.status === 'failed' && g.error ? `<span class="text-[11px] text-red-400 truncate max-w-[120px]">${g.error}</span>` : ''}
+        </div>
+        <div class="flex gap-1.5">
+          ${g.status === 'completed' ? `
+            <button onclick="openHistoryPreview('${docType}', '${g.id}')" class="px-2 py-1 text-[11px] bg-[#0b0b12] border border-[#24243a] rounded hover:border-purple-500/50 transition-all">Preview</button>
+            <button onclick="downloadVersion('${g.id}')" class="px-2 py-1 text-[11px] bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded hover:bg-blue-600/30 transition-all">Download</button>
+          ` : `<span class="text-[11px] text-gray-600 px-1">—</span>`}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function openHistoryPreview(docType, genId) {
+  try {
+    const res = await fetch(`/api/projects/${state.projectId}/generations/${genId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    showDocPreview(docType, data.content, `v${data.version}`);
+  } catch (e) {
+    showToast('Gagal load versi', 'error');
+  }
+}
+
+function closeHistory() {
+  $('genHistory').classList.add('hidden');
+  $('genHistoryList').innerHTML = '';
+}
 </script>
 </body>
 </html>
