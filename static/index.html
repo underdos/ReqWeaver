@@ -1342,6 +1342,14 @@ function closeHistory() {
   $('genHistory').classList.add('hidden');
   $('genHistoryList').innerHTML = '';
 }
+
+// ─── INIT ───────────────────────────────────────────────
+loadProjects();
+checkAiStatus();
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
 </script>
 </body>
 </html>
