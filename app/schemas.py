@@ -99,6 +99,7 @@ class ProjectSummary(BaseModel):
     created_at: datetime
     updated_at: datetime
     stats: dict = {}
+    generation_versions: dict = {}
 
     model_config = {"from_attributes": True}
 

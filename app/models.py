@@ -128,6 +128,21 @@ class SequenceFlow(SQLModel, table=True):
     steps: str = ""   # newline-separated: actor -> action -> note
 
 
+# ─── Document Generation History ───────────────────────────
+class DocumentGeneration(SQLModel, table=True):
+    __tablename__ = "document_generations"
+    id: str = Field(default=None, primary_key=True)
+    project_id: str = Field(foreign_key="projects.id")
+    doc_type: str  # prd, fsd, srs, erd, sequence
+    mode: str = "auto"
+    version: int = 1
+    content: str = ""
+    status: str = "pending"  # pending, processing, completed, failed
+    error: str = ""
+    created_at: datetime = Field(default=None)
+    completed_at: Optional[datetime] = Field(default=None)
+
+
 # ─── Project ─────────────────────────────────────────────
 class Project(SQLModel, table=True):
     __tablename__ = "projects"

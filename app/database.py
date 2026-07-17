@@ -14,3 +14,8 @@ def get_session():
 
 def init_db():
     SQLModel.metadata.create_all(engine)
+
+
+def create_session() -> Session:
+    """Create a new standalone session (for background tasks)."""
+    return Session(engine)

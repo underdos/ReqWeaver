@@ -362,18 +362,30 @@
 
       <!-- Action Buttons -->
         <div class="flex flex-wrap gap-3 mt-4">
-          <button onclick="saveAndGenerate()" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
-            <i class="fas fa-save"></i> Save & Generate All
+          <button onclick="generateAll()" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
+            <i class="fas fa-robot"></i> Generate All
           </button>
           <button onclick="downloadAll()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
             <i class="fas fa-file-archive"></i> Download All (ZIP)
           </button>
         </div>
 
+        <!-- Generation queue status -->
+        <div id="genQueue" class="hidden mt-6 space-y-2">
+          <h3 class="text-sm font-semibold text-gray-400">Generation Progress</h3>
+          <div id="genQueueList" class="space-y-2"></div>
+        </div>
+
         <!-- Generated docs preview -->
         <div id="generatedDocs" class="hidden mt-8">
           <h3 class="text-sm font-semibold text-gray-400 mb-3">Generated Documents</h3>
           <div id="docList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        </div>
+
+        <!-- Generation History -->
+        <div id="genHistory" class="hidden mt-8">
+          <h3 class="text-sm font-semibold text-gray-400 mb-3">📜 Generation History <span id="historyDocType" class="text-xs text-gray-500 font-normal"></span></h3>
+          <div id="genHistoryList" class="space-y-2"></div>
         </div>
       </div>
 
@@ -399,27 +411,18 @@ const state = {
   totalSteps: 9,
   projectId: null,
   editing: false,
-  genMode: 'auto',        // 'ai' | 'template' | 'auto'
-  aiAvailable: false,     // whether API key is configured
+  genMode: 'auto',
+  aiAvailable: false,
   aiLoading: false,
   projectData: {
-    name: '',
-    description: '',
-    goals: '',
-    business_context: '',
-    success_metrics: '',
-    constraints: '',
-    tech_stack: '',
-    stakeholders: [],
-    target_users: [],
-    features: [],
-    functional_reqs: [],
-    non_functional_reqs: [],
-    entities: [],
-    relationships: [],
-    sequence_flows: [],
+    name: '', description: '', goals: '', business_context: '', success_metrics: '', constraints: '', tech_stack: '',
+    stakeholders: [], target_users: [], features: [], functional_reqs: [], non_functional_reqs: [],
+    entities: [], relationships: [], sequence_flows: [],
   },
-  generated: {},
+  generated: {},        // doc_type -> { content, version, generation_id, status }
+  genQueue: [],          // [{ doc_type, generation_id, status }]
+  pollingIntervals: {},  // doc_type -> interval id
+  loadedGenerations: {}, // doc_type -> available versions
 };
 
 // ─── DOM REFS ──────────────────────────────────────────
@@ -988,80 +991,258 @@ async function checkAiStatus() {
   }
 }
 
-// ─── SAVE & GENERATE ────────────────────────────────────
-async function saveAndGenerate() {
+// ─── SAVE PROJECT ────────────────────────────────────────
+async function saveProject() {
   syncProjectInfo();
-  
   if (!state.projectData.name) {
     showToast('Nama project harus diisi!', 'error');
     goToStep(0);
-    return;
+    return null;
   }
-
-  const btn = event?.target || $('btnNext');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Saving...';
-
   try {
     let projectId = state.projectId;
     const payload = { ...state.projectData };
-
     if (projectId && state.editing) {
-      // Save project info update
       await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: payload.name,
-          description: payload.description,
-          goals: payload.goals,
-          business_context: payload.business_context,
-          success_metrics: payload.success_metrics,
-          constraints: payload.constraints,
+          name: payload.name, description: payload.description,
+          goals: payload.goals, business_context: payload.business_context,
+          success_metrics: payload.success_metrics, constraints: payload.constraints,
           tech_stack: payload.tech_stack,
         }),
       });
-      // Since we can't easily update nested items via PATCH, we recreate
       await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
     }
-
-    // Create/recreate project
     const res = await fetch('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || 'Failed to save');
-    }
-
+    if (!res.ok) throw new Error((await res.json()).detail || 'Failed to save');
     const project = await res.json();
     state.projectId = project.id;
     state.editing = true;
-
-    // Generate documents
-    const genRes = await fetch(`/api/projects/${project.id}/generate?mode=${state.genMode}`, { method: 'POST' });
-    const genData = await genRes.json();
-    state.generated = genData.documents || {};
     state.projectData.name = project.name;
-
-    showToast(`✅ Project "${project.name}" saved & documents generated!`);
-    renderGeneratedDocs();
-    $('generatedDocs').classList.remove('hidden');
+    showToast(`✅ Project "${project.name}" saved!`);
     loadProjects();
     $('currentProjectName').textContent = project.name;
-
+    return project;
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = 'Save & Generate All';
+    return null;
   }
 }
 
+// ─── GENERATE (Background) ──────────────────────────────
+
+async function generateDoc(docType) {
+  if (!state.projectId) {
+    const proj = await saveProject();
+    if (!proj) return;
+  }
+  const btn = document.querySelector(`[data-genbtn="${docType}"]`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+
+  try {
+    const res = await fetch(`/api/projects/${state.projectId}/generate/${docType}?mode=${state.genMode}`, { method: 'POST' });
+    if (!res.ok) throw new Error((await res.json()).detail || 'Generation failed');
+    const data = await res.json();
+    
+    // Track in queue
+    state.genQueue.push({ doc_type: docType, generation_id: data.generation_id, status: 'pending' });
+    state.generated[docType] = { content: '', version: data.version, generation_id: data.generation_id, status: 'pending' };
+    renderGenQueue();
+    
+    // Start polling
+    pollGeneration(data.generation_id, docType);
+  } catch (e) {
+    showToast(`Error generating ${docType}: ${e.message}`, 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Generate'; }
+  }
+}
+
+async function generateAll() {
+  if (!state.projectId) {
+    const proj = await saveProject();
+    if (!proj) return;
+  }
+  const docs = ['prd', 'fsd', 'srs', 'erd', 'sequence'];
+  const btn = document.querySelector('[onclick="generateAll()"]');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generating...'; }
+  
+  // Clear any previous intervals
+  Object.values(state.pollingIntervals).forEach(clearInterval);
+  state.pollingIntervals = {};
+  state.genQueue = [];
+  $('genQueue').classList.remove('hidden');
+
+  for (const dt of docs) {
+    try {
+      const res = await fetch(`/api/projects/${state.projectId}/generate/${dt}?mode=${state.genMode}`, { method: 'POST' });
+      if (!res.ok) continue;
+      const data = await res.json();
+      state.genQueue.push({ doc_type: dt, generation_id: data.generation_id, status: 'pending' });
+      state.generated[dt] = { content: '', version: data.version, generation_id: data.generation_id, status: 'pending' };
+    } catch (e) {
+      console.error(`Failed to trigger ${dt}:`, e);
+    }
+  }
+  renderGenQueue();
+  
+  // Poll all
+  state.genQueue.forEach(g => pollGeneration(g.generation_id, g.doc_type));
+  
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-robot"></i> Generate All'; }
+}
+
+async function pollGeneration(genId, docType) {
+  const poll = async () => {
+    try {
+      const res = await fetch(`/api/projects/${state.projectId}/generations/${genId}/status`);
+      if (!res.ok) { stopPolling(docType); return; }
+      const data = await res.json();
+      
+      // Update state
+      if (!state.generated[docType]) state.generated[docType] = {};
+      state.generated[docType].status = data.status;
+      state.generated[docType].version = data.version;
+      state.generated[docType].generation_id = genId;
+      
+      // Update queue display
+      updateGenQueueItem(docType, data.status);
+      
+      if (data.status === 'completed') {
+        stopPolling(docType);
+        // Fetch content
+        const contentRes = await fetch(`/api/projects/${state.projectId}/generations/${genId}`);
+        if (contentRes.ok) {
+          const contentData = await contentRes.json();
+          state.generated[docType].content = contentData.content || '';
+          renderGeneratedDocs();
+          $('generatedDocs').classList.remove('hidden');
+          showToast(`📄 ${docType.toUpperCase()} selesai!`, 'success');
+        }
+      } else if (data.status === 'failed') {
+        stopPolling(docType);
+        showToast(`❌ ${docType.toUpperCase()} gagal: ${data.error}`, 'error');
+      }
+    } catch (e) {
+      console.error(`Poll error for ${docType}:`, e);
+    }
+  };
+  
+  // Poll immediately then every 2s
+  await poll();
+  state.pollingIntervals[docType] = setInterval(poll, 2000);
+}
+
+function stopPolling(docType) {
+  if (state.pollingIntervals[docType]) {
+    clearInterval(state.pollingIntervals[docType]);
+    delete state.pollingIntervals[docType];
+  }
+}
+
+function renderGenQueue() {
+  const list = $('genQueueList');
+  if (!state.genQueue.length) { $('genQueue').classList.add('hidden'); return; }
+  $('genQueue').classList.remove('hidden');
+  list.innerHTML = state.genQueue.map(g => `
+    <div id="genq-${g.doc_type}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-[#171720] border border-[#24243a]">
+      <span class="genq-icon text-sm">⏳</span>
+      <span class="text-sm font-medium flex-1">${g.doc_type.toUpperCase()}</span>
+      <span class="genq-status text-xs text-gray-500">waiting...</span>
+    </div>
+  `).join('');
+}
+
+function updateGenQueueItem(docType, status) {
+  const el = $(`genq-${docType}`);
+  if (!el) return;
+  const icon = el.querySelector('.genq-icon');
+  const statusEl = el.querySelector('.genq-status');
+  if (status === 'processing') {
+    icon.textContent = '🔄';
+    statusEl.textContent = 'processing...';
+    statusEl.className = 'genq-status text-xs text-yellow-400';
+  } else if (status === 'completed') {
+    icon.textContent = '✅';
+    statusEl.textContent = 'done';
+    statusEl.className = 'genq-status text-xs text-green-400';
+  } else if (status === 'failed') {
+    icon.textContent = '❌';
+    statusEl.textContent = 'failed';
+    statusEl.className = 'genq-status text-xs text-red-400';
+  }
+}
+
+// ─── HISTORY ────────────────────────────────────────────
+
+async function loadHistory(docType) {
+  if (!state.projectId) return;
+  try {
+    const res = await fetch(`/api/projects/${state.projectId}/generations?doc_type=${docType}&limit=20`);
+    if (!res.ok) return;
+    const gens = await res.json();
+    state.loadedGenerations[docType] = gens;
+    renderHistory(docType, gens);
+  } catch (e) {
+    console.error('Failed to load history:', e);
+  }
+}
+
+function renderHistory(docType, gens) {
+  const list = $('genHistoryList');
+  if (!gens || !gens.length) {
+    list.innerHTML = '<div class="text-xs text-gray-600">Belum ada riwayat generasi.</div>';
+    return;
+  }
+  const docNames = { prd: 'PRD', fsd: 'FSD', srs: 'SRS', erd: 'ERD', sequence: 'Sequence' };
+  $('historyDocType').textContent = `— ${docNames[docType] || docType}`;
+  $('genHistory').classList.remove('hidden');
+  
+  list.innerHTML = gens.map(g => {
+    const isLatest = state.generated[docType] && state.generated[docType].version === g.version && state.generated[docType].status === 'completed';
+    return `
+      <div class="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-[#171720] border ${isLatest ? 'border-purple-500/40' : 'border-[#24243a]'}">
+        <div class="flex-1">
+          <span class="text-sm font-medium">v${g.version}</span>
+          <span class="text-xs text-gray-500 ml-2">${g.mode}</span>
+          <span class="text-xs text-gray-500 ml-2">${g.status}</span>
+          ${g.status === 'completed' ? `<span class="text-xs text-gray-600 ml-2">${g.completed_at ? new Date(g.completed_at).toLocaleString() : ''}</span>` : ''}
+          ${g.status === 'failed' ? `<span class="text-xs text-red-400 ml-2">${g.error}</span>` : ''}
+        </div>
+        <div class="flex gap-2">
+          ${g.status === 'completed' ? `
+            <button onclick="previewVersion('${docType}', '${g.id}')" class="px-2.5 py-1 text-xs bg-[#0b0b12] border border-[#24243a] rounded hover:border-purple-500/50 transition-all">Preview</button>
+            <button onclick="downloadVersion('${g.id}')" class="px-2.5 py-1 text-xs bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded hover:bg-blue-600/30 transition-all">Download</button>
+          ` : `<span class="text-xs text-gray-600 px-2">${g.status}</span>`}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function previewVersion(docType, genId) {
+  try {
+    const res = await fetch(`/api/projects/${state.projectId}/generations/${genId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    showDocPreview(docType, data.content, `v${data.version}`);
+  } catch (e) {
+    showToast('Failed to load version', 'error');
+  }
+}
+
+function downloadVersion(genId) {
+  if (!state.projectId) return;
+  window.open(`/api/projects/${state.projectId}/download/gen/${genId}`, '_blank');
+}
+
 // ─── DOCUMENT PREVIEW & DOWNLOAD ────────────────────────
+
 function renderGeneratedDocs() {
   const list = $('docList');
   const docs = [
@@ -1073,37 +1254,42 @@ function renderGeneratedDocs() {
   ];
 
   list.innerHTML = docs.map(d => {
-    const md = state.generated[d.key] || '';
-    const hasContent = md.length > 0;
+    const gen = state.generated[d.key] || {};
+    const hasContent = gen.content && gen.content.length > 0;
+    const isProcessing = gen.status === 'pending' || gen.status === 'processing';
     return `
       <div class="card-item ${hasContent ? 'border-purple-500/30' : ''}">
         <div class="flex items-center gap-3 mb-3">
           <span class="text-${d.color}-400 text-lg"><i class="fas ${d.icon}"></i></span>
           <div class="flex-1">
             <div class="font-semibold text-sm">${d.label}</div>
-            <div class="text-xs text-gray-500">${hasContent ? (md.length/1000).toFixed(1) + ' KB' : 'Not generated'}</div>
+            <div class="text-xs text-gray-500">
+              ${hasContent ? `${(gen.content.length/1000).toFixed(1)} KB` : isProcessing ? '⏳ Generating...' : '—'}
+              ${gen.version ? `v${gen.version}` : ''}
+            </div>
           </div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
+          <button data-genbtn="${d.key}" onclick="generateDoc('${d.key}')" class="flex-1 px-3 py-1.5 bg-purple-600/20 text-purple-400 border border-purple-600/30 rounded-lg text-xs hover:bg-purple-600/30 transition-all">
+            ${isProcessing ? '<span class="spinner"></span>' : hasContent ? '🔄 Re-generate' : '🤖 Generate'}
+          </button>
           ${hasContent ? `
-            <button onclick="previewDoc('${d.key}')" class="flex-1 px-3 py-1.5 bg-[#0b0b12] border border-[#24243a] rounded-lg text-xs hover:border-purple-500/50 transition-all">Preview</button>
-            <button onclick="downloadDoc('${d.key}')" class="flex-1 px-3 py-1.5 bg-${d.color}-600/20 text-${d.color}-400 border border-${d.color}-600/30 rounded-lg text-xs hover:bg-${d.color}-600/30 transition-all">Download</button>
-          ` : '<span class="text-xs text-gray-600 py-1">Generate dulu</span>'}
+            <button onclick="previewDoc('${d.key}')" class="px-3 py-1.5 bg-[#0b0b12] border border-[#24243a] rounded-lg text-xs hover:border-purple-500/50 transition-all">Preview</button>
+            <button onclick="downloadLatest('${d.key}')" class="px-3 py-1.5 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-lg text-xs hover:bg-blue-600/30 transition-all">Download</button>
+            <button onclick="loadHistory('${d.key}')" class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition-all" title="Lihat riwayat versi"><i class="fas fa-clock-rotate"></i></button>
+          ` : ''}
         </div>
       </div>
     `;
   }).join('');
 }
 
-function previewDoc(docType) {
-  const md = state.generated[docType];
-  if (!md) { showToast('Document not generated yet', 'error'); return; }
-
+function showDocPreview(docType, content, versionLabel) {
+  if (!content) { showToast('Tidak ada konten', 'error'); return; }
   const docNames = { prd: 'PRD', fsd: 'FSD', srs: 'SRS', erd: 'ERD', sequence: 'Sequence Diagram' };
-  $('modalTitle').textContent = `📄 ${docNames[docType] || docType} — Preview`;
+  $('modalTitle').textContent = `📄 ${docNames[docType] || docType} ${versionLabel ? '(' + versionLabel + ')' : ''}`;
 
-  // Simple markdown to HTML rendering
-  let html = escapeHtml(md)
+  let html = escapeHtml(content)
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
@@ -1125,10 +1311,15 @@ function previewDoc(docType) {
     .replace(/\n/g, '<br>');
 
   html = `<div class="markdown-body"><p>${html}</p></div>`;
-
   $('modalBody').innerHTML = html;
   $('modalBackdrop').classList.add('show');
   $('modalPanel').classList.add('show');
+}
+
+function previewDoc(docType) {
+  const gen = state.generated[docType];
+  if (!gen || !gen.content) { showToast('Belum digenerate', 'error'); return; }
+  showDocPreview(docType, gen.content, `v${gen.version}`);
 }
 
 function closeModal() {
@@ -1136,7 +1327,7 @@ function closeModal() {
   $('modalPanel').classList.remove('show');
 }
 
-function downloadDoc(docType) {
+function downloadLatest(docType) {
   if (!state.projectId) { showToast('Save project first', 'error'); return; }
   window.open(`/api/projects/${state.projectId}/download/${docType}`, '_blank');
 }
@@ -1150,7 +1341,6 @@ function downloadAll() {
 loadProjects();
 checkAiStatus();
 
-// Keyboard navigation
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeModal();
 });
