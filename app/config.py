@@ -12,6 +12,7 @@ class Settings:
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
     OPENAI_TIMEOUT: int = int(os.getenv("OPENAI_TIMEOUT", "120"))
+    OPENAI_MAX_TOKENS: int = int(os.getenv("OPENAI_MAX_TOKENS", "250000"))
     
     # App
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./reqweaver.db")

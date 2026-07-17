@@ -292,7 +292,7 @@ def _call_ai(doc_type: str, context: str, settings) -> Optional[str]:
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.4,
-        max_tokens=4096,
+        max_tokens=settings.OPENAI_MAX_TOKENS,
     )
     
     return response.choices[0].message.content
