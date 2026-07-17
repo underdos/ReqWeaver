@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from app.database import init_db
 from app.routers import projects as projects_router
+from app.config import get_settings
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
@@ -64,6 +65,17 @@ def serve_index():
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "1.0.0"}
+
+
+@app.get("/api/ai/status")
+def ai_status():
+    """Check if AI generation is configured."""
+    settings = get_settings()
+    return {
+        "available": settings.ai_available,
+        "configured": bool(settings.OPENAI_API_KEY),
+        "model": settings.OPENAI_MODEL if settings.ai_available else None,
+    }
 
 
 # ─── API Routes ────────────────────────────────────────

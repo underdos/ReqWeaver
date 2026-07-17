@@ -338,7 +338,29 @@
           <div class="card-item text-center py-6"><div class="text-2xl font-bold text-pink-400" id="r_entities">0</div><div class="text-xs text-gray-500 mt-1">Entities</div></div>
         </div>
 
-        <!-- Action Buttons -->
+        <!-- Mode Toggle -->
+      <div class="mb-6 p-4 rounded-xl border border-[#24243a] bg-[#171720]">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="font-semibold text-sm">Generation Mode</h3>
+            <p class="text-xs text-gray-500 mt-0.5" id="modeDescription">
+              AI: generates rich documents using OpenAI (80-90% complete).
+              Template: uses predefined Jinja2 templates.
+            </p>
+          </div>
+          <div class="flex items-center gap-2 bg-[#0b0b12] rounded-lg p-1 border border-[#24243a]">
+            <button id="modeAi" onclick="setGenMode('ai')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition-all">🤖 AI</button>
+            <button id="modeAuto" onclick="setGenMode('auto')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition-all bg-purple-600 text-white">⚡ Auto</button>
+            <button id="modeTemplate" onclick="setGenMode('template')" class="px-3 py-1.5 rounded-md text-xs font-semibold transition-all">📄 Template</button>
+          </div>
+        </div>
+        <div id="aiStatus" class="mt-2 text-xs flex items-center gap-2">
+          <span class="pulse-dot bg-gray-500"></span>
+          <span class="text-gray-500">Checking AI availability...</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
         <div class="flex flex-wrap gap-3 mt-4">
           <button onclick="saveAndGenerate()" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all flex items-center gap-2">
             <i class="fas fa-save"></i> Save & Generate All
@@ -377,6 +399,9 @@ const state = {
   totalSteps: 9,
   projectId: null,
   editing: false,
+  genMode: 'auto',        // 'ai' | 'template' | 'auto'
+  aiAvailable: false,     // whether API key is configured
+  aiLoading: false,
   projectData: {
     name: '',
     description: '',
@@ -922,6 +947,47 @@ function updateReview() {
   $('r_entities').textContent = state.projectData.entities.length;
 }
 
+// ─── MODE TOGGLE ────────────────────────────────────────────
+function setGenMode(mode) {
+  state.genMode = mode;
+  ['ai', 'auto', 'template'].forEach(m => {
+    const btn = $(`mode${m.charAt(0).toUpperCase() + m.slice(1)}`);
+    if (btn) {
+      btn.classList.remove('bg-purple-600', 'text-white');
+      btn.classList.add('text-gray-400');
+    }
+  });
+  const active = $(`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`);
+  if (active) {
+    active.classList.remove('text-gray-400');
+    active.classList.add('bg-purple-600', 'text-white');
+  }
+  const desc = $('modeDescription');
+  if (mode === 'ai') {
+    desc.innerHTML = '<span class="text-purple-400 font-medium">AI Mode</span> → generates rich documents via OpenAI API. Requires API key. Results are 80-90% complete.';
+  } else if (mode === 'auto') {
+    desc.innerHTML = '<span class="text-blue-400 font-medium">Auto Mode</span> → uses AI if API key is configured, falls back to template otherwise. Best of both worlds.';
+  } else {
+    desc.innerHTML = '<span class="text-gray-400 font-medium">Template Mode</span> → uses predefined Jinja2 templates. Fast but basic.';
+  }
+}
+
+async function checkAiStatus() {
+  try {
+    const res = await fetch('/api/ai/status');
+    const data = await res.json();
+    state.aiAvailable = data.available;
+    const statusEl = $('aiStatus');
+    if (data.available) {
+      statusEl.innerHTML = `<span class="pulse-dot bg-green-500"></span><span class="text-green-400">AI Ready — ${data.model}</span>`;
+    } else {
+      statusEl.innerHTML = `<span class="pulse-dot bg-gray-500"></span><span class="text-gray-500">AI not configured — add OPENAI_API_KEY to enable AI generation</span>`;
+    }
+  } catch (e) {
+    console.error('AI status check failed', e);
+  }
+}
+
 // ─── SAVE & GENERATE ────────────────────────────────────
 async function saveAndGenerate() {
   syncProjectInfo();
@@ -976,7 +1042,7 @@ async function saveAndGenerate() {
     state.editing = true;
 
     // Generate documents
-    const genRes = await fetch(`/api/projects/${project.id}/generate`, { method: 'POST' });
+    const genRes = await fetch(`/api/projects/${project.id}/generate?mode=${state.genMode}`, { method: 'POST' });
     const genData = await genRes.json();
     state.generated = genData.documents || {};
     state.projectData.name = project.name;
@@ -1082,6 +1148,7 @@ function downloadAll() {
 
 // ─── INIT ───────────────────────────────────────────────
 loadProjects();
+checkAiStatus();
 
 // Keyboard navigation
 document.addEventListener('keydown', (e) => {

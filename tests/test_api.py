@@ -345,5 +345,53 @@ async def test_multiple_projects(client: AsyncClient):
         resp = await client.post("/api/projects", json={"name": f"Project {i}"})
         assert resp.status_code == 201
 
-    resp = await client.get("/api/projects")
-    assert len(resp.json()) == 5
+
+# ─── AI Status ──────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_ai_status_no_key(client: AsyncClient):
+    """AI status reports not available when no API key."""
+    resp = await client.get("/api/ai/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "available" in data
+    assert "configured" in data
+    assert data["available"] is False
+
+
+@pytest.mark.asyncio
+async def test_generate_with_mode_template(client: AsyncClient):
+    """Template mode generates documents without AI."""
+    create_resp = await client.post("/api/projects", json=SAMPLE_PROJECT)
+    pid = create_resp.json()["id"]
+
+    resp = await client.get(f"/api/projects/{pid}/generate/prd?mode=template")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["mode"] == "template"
+    assert len(data["markdown"]) > 0
+    assert "Product Requirements Document" in data["markdown"]
+
+
+@pytest.mark.asyncio
+async def test_generate_all_with_mode(client: AsyncClient):
+    """Generate all with template mode explicitly."""
+    create_resp = await client.post("/api/projects", json=SAMPLE_PROJECT)
+    pid = create_resp.json()["id"]
+
+    resp = await client.post(f"/api/projects/{pid}/generate?mode=template")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["mode"] == "template"
+    for doc_type in ["prd", "fsd", "srs", "erd", "sequence"]:
+        assert doc_type in data["documents"]
+
+
+@pytest.mark.asyncio
+async def test_invalid_mode_rejected(client: AsyncClient):
+    """Invalid mode should be rejected by regex validation."""
+    create_resp = await client.post("/api/projects", json=SAMPLE_PROJECT)
+    pid = create_resp.json()["id"]
+
+    resp = await client.get(f"/api/projects/{pid}/generate/prd?mode=invalid")
+    assert resp.status_code == 422

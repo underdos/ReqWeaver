@@ -1,6 +1,6 @@
 """API Routes — CRUD projects + document generation + download"""
 from __future__ import annotations
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlmodel import Session, select
 from typing import List
 import zipfile, io
@@ -12,7 +12,9 @@ from app.models import (
     Entity, EntityAttribute, EntityRelationship, SequenceFlow,
 )
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectSummary, ProjectDetail
-from app.services.document_generator import generate_document, generate_all, DOC_NAMES, get_doc_filename
+from app.services.document_generator import DOC_NAMES, get_doc_filename
+from app.services.ai_generator import generate_document as ai_generate_doc
+from app.services.ai_generator import generate_all as ai_generate_all
 
 from datetime import datetime, timezone
 import uuid
@@ -152,36 +154,50 @@ def delete_project(project_id: str, session: Session = Depends(get_session)):
 # ─── Document Generation ────────────────────────────────
 
 @router.post("/{project_id}/generate")
-def generate_project_docs(project_id: str, session: Session = Depends(get_session)):
-    """Generate all document types for a project."""
+def generate_project_docs(
+    project_id: str,
+    mode: str = Query("auto", regex="^(ai|template|auto)$"),
+    session: Session = Depends(get_session),
+):
+    """Generate all document types for a project. Mode: ai, template, auto."""
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    docs = generate_all(project)
-    return {"project_id": project_id, "project_name": project.name, "documents": docs}
+    docs = ai_generate_all(project, mode)
+    return {"project_id": project_id, "project_name": project.name, "mode": mode, "documents": docs}
 
 
 @router.get("/{project_id}/generate/{doc_type}")
-def generate_single_doc(project_id: str, doc_type: str, session: Session = Depends(get_session)):
-    """Generate a single document type."""
+def generate_single_doc(
+    project_id: str,
+    doc_type: str,
+    mode: str = Query("auto", regex="^(ai|template|auto)$"),
+    session: Session = Depends(get_session),
+):
+    """Generate a single document type. Mode: ai, template, auto."""
     if doc_type not in DOC_NAMES:
         raise HTTPException(status_code=400, detail=f"Unknown document type. Choose from {list(DOC_NAMES.keys())}")
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    markdown = generate_document(project, doc_type)
-    return {"project_id": project_id, "project_name": project.name, "doc_type": doc_type, "markdown": markdown}
+    markdown = ai_generate_doc(project, doc_type, mode)
+    return {"project_id": project_id, "project_name": project.name, "doc_type": doc_type, "mode": mode, "markdown": markdown}
 
 
 @router.get("/{project_id}/download/{doc_type}")
-def download_doc(project_id: str, doc_type: str, session: Session = Depends(get_session)):
-    """Download a single document as .md file."""
+def download_doc(
+    project_id: str,
+    doc_type: str,
+    mode: str = Query("auto", regex="^(ai|template|auto)$"),
+    session: Session = Depends(get_session),
+):
+    """Download a single document as .md file. Mode: ai, template, auto."""
     if doc_type not in DOC_NAMES:
         raise HTTPException(status_code=400, detail=f"Unknown document type. Choose from {list(DOC_NAMES.keys())}")
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    markdown = generate_document(project, doc_type)
+    markdown = ai_generate_doc(project, doc_type, mode)
     safe_name = project.name.replace(" ", "-").lower()
     filename = f"{safe_name}-{get_doc_filename(doc_type)}.md"
     from fastapi.responses import PlainTextResponse
@@ -193,12 +209,16 @@ def download_doc(project_id: str, doc_type: str, session: Session = Depends(get_
 
 
 @router.get("/{project_id}/download-all")
-def download_all(project_id: str, session: Session = Depends(get_session)):
-    """Download all documents as a ZIP file."""
+def download_all(
+    project_id: str,
+    mode: str = Query("auto", regex="^(ai|template|auto)$"),
+    session: Session = Depends(get_session),
+):
+    """Download all documents as a ZIP file. Mode: ai, template, auto."""
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    docs = generate_all(project)
+    docs = ai_generate_all(project, mode)
     safe_name = project.name.replace(" ", "-").lower()
 
     buf = io.BytesIO()

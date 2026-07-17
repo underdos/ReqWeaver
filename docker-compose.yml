@@ -7,6 +7,9 @@ services:
       - "127.0.0.1:8060:8060"
     environment:
       - DATABASE_URL=sqlite:///./data/reqweaver.db
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
     volumes:
       - reqweaver-data:/app/data
     healthcheck:
