@@ -329,11 +329,12 @@ def generate_document(project: Project, doc_type: str, mode: str = "auto") -> st
             if result:
                 return result
         except Exception as e:
-            # Log the error and fallback
             import logging
-            logging.getLogger(__name__).warning(
-                f"AI generation failed for {doc_type}, falling back to template: {e}"
-            )
+            logger = logging.getLogger(__name__)
+            logger.warning(f"AI generation failed for {doc_type}, falling back to template: {e}")
+            # Print to stderr so Docker logs capture it
+            import sys
+            print(f"[AI FALLBACK] {doc_type}: {e}", file=sys.stderr)
     
     # Fallback: use Jinja2 template
     return template_generate(project, doc_type)
