@@ -272,9 +272,14 @@
         <h2 class="text-xl font-bold mb-1">Core Features</h2>
         <p class="text-sm text-gray-500 mb-6">Fitur-fitur utama yang akan dibangun. Prioritaskan dengan MoSCoW method.</p>
         <div id="featureList" class="space-y-3 mb-4 max-w-2xl"></div>
-        <button onclick="addFeature()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
-          <i class="fas fa-plus"></i> Tambah Fitur
-        </button>
+        <div class="flex items-center gap-2 max-w-2xl">
+          <button onclick="addFeature()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+            <i class="fas fa-plus"></i> Tambah Fitur
+          </button>
+          <button data-ai-btn="features" onclick="aiSuggest('features')" class="flex items-center gap-2 px-4 py-2 bg-purple-600/20 border border-purple-600/30 hover:bg-purple-600/40 rounded-lg text-sm text-purple-400 hover:text-purple-300 transition-all">
+            <i class="fas fa-wand-magic-sparkles"></i> ✨ AI Suggest
+          </button>
+        </div>
       </div>
 
       <!-- STEP 4: Functional Requirements -->
@@ -282,9 +287,14 @@
         <h2 class="text-xl font-bold mb-1">Functional Requirements</h2>
         <p class="text-sm text-gray-500 mb-6">Persyaratan fungsional yang spesifik — apa yang sistem harus lakukan.</p>
         <div id="funcReqList" class="space-y-3 mb-4 max-w-2xl"></div>
-        <button onclick="addFuncReq()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
-          <i class="fas fa-plus"></i> Tambah Functional Requirement
-        </button>
+        <div class="flex items-center gap-2 max-w-2xl">
+          <button onclick="addFuncReq()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+            <i class="fas fa-plus"></i> Tambah Functional Requirement
+          </button>
+          <button data-ai-btn="func_reqs" onclick="aiSuggest('func_reqs')" class="flex items-center gap-2 px-4 py-2 bg-purple-600/20 border border-purple-600/30 hover:bg-purple-600/40 rounded-lg text-sm text-purple-400 hover:text-purple-300 transition-all">
+            <i class="fas fa-wand-magic-sparkles"></i> ✨ AI Suggest
+          </button>
+        </div>
       </div>
 
       <!-- STEP 5: Non-Functional Requirements -->
@@ -292,9 +302,14 @@
         <h2 class="text-xl font-bold mb-1">Non-Functional Requirements</h2>
         <p class="text-sm text-gray-500 mb-6">Persyaratan kualitas — performance, security, usability, dll.</p>
         <div id="nfrList" class="space-y-3 mb-4 max-w-2xl"></div>
-        <button onclick="addNFR()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
-          <i class="fas fa-plus"></i> Tambah NFR
-        </button>
+        <div class="flex items-center gap-2 max-w-2xl">
+          <button onclick="addNFR()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+            <i class="fas fa-plus"></i> Tambah NFR
+          </button>
+          <button data-ai-btn="nfr" onclick="aiSuggest('nfr')" class="flex items-center gap-2 px-4 py-2 bg-purple-600/20 border border-purple-600/30 hover:bg-purple-600/40 rounded-lg text-sm text-purple-400 hover:text-purple-300 transition-all">
+            <i class="fas fa-wand-magic-sparkles"></i> ✨ AI Suggest
+          </button>
+        </div>
       </div>
 
       <!-- STEP 6: Data Model -->
@@ -302,9 +317,14 @@
         <h2 class="text-xl font-bold mb-1">Data Model</h2>
         <p class="text-sm text-gray-500 mb-6">Definisikan entity, atribut, dan hubungan antar data dalam sistem.</p>
         <div id="entityList" class="space-y-3 mb-4 max-w-2xl"></div>
-        <button onclick="addEntity()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
-          <i class="fas fa-plus"></i> Tambah Entity
-        </button>
+        <div class="flex items-center gap-2 max-w-2xl mb-6">
+          <button onclick="addEntity()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+            <i class="fas fa-plus"></i> Tambah Entity
+          </button>
+          <button data-ai-btn="data_model" onclick="aiSuggest('data_model')" class="flex items-center gap-2 px-4 py-2 bg-purple-600/20 border border-purple-600/30 hover:bg-purple-600/40 rounded-lg text-sm text-purple-400 hover:text-purple-300 transition-all">
+            <i class="fas fa-wand-magic-sparkles"></i> ✨ AI Suggest
+          </button>
+        </div>
         <div class="mt-6">
           <h3 class="text-sm font-semibold mb-3 text-gray-400">Entity Relationships</h3>
           <div id="relList" class="space-y-3 mb-3 max-w-2xl"></div>
@@ -319,9 +339,14 @@
         <h2 class="text-xl font-bold mb-1">System Interactions</h2>
         <p class="text-sm text-gray-500 mb-6">Definisikan sequence flow — siapa melakukan apa, dalam urutan apa.</p>
         <div id="flowList" class="space-y-3 mb-4 max-w-2xl"></div>
-        <button onclick="addSequenceFlow()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
-          <i class="fas fa-plus"></i> Tambah Sequence Flow
-        </button>
+        <div class="flex items-center gap-2 max-w-2xl">
+          <button onclick="addSequenceFlow()" class="flex items-center gap-2 px-4 py-2 bg-[#171720] border border-dashed border-[#24243a] hover:border-purple-500/50 rounded-lg text-sm text-gray-400 hover:text-purple-400 transition-all">
+            <i class="fas fa-plus"></i> Tambah Sequence Flow
+          </button>
+          <button data-ai-btn="system_interactions" onclick="aiSuggest('system_interactions')" class="flex items-center gap-2 px-4 py-2 bg-purple-600/20 border border-purple-600/30 hover:bg-purple-600/40 rounded-lg text-sm text-purple-400 hover:text-purple-300 transition-all">
+            <i class="fas fa-wand-magic-sparkles"></i> ✨ AI Suggest
+          </button>
+        </div>
       </div>
 
       <!-- STEP 8: Review & Generate -->
@@ -1036,6 +1061,156 @@ async function saveProject() {
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
     return null;
+  }
+}
+
+// ─── AI SUGGEST ──────────────────────────────────────────
+
+async function aiSuggest(step) {
+  // Map step names to display labels
+  const labels = {
+    features: 'Features',
+    func_reqs: 'Functional Requirements',
+    nfr: 'Non-Functional Requirements',
+    data_model: 'Data Model',
+    system_interactions: 'System Interactions',
+  };
+
+  // Save project first to make sure we have the latest data
+  if (!state.projectId) {
+    const proj = await saveProject();
+    if (!proj) return;
+  }
+
+  const btn = document.querySelector(`[data-ai-btn="${step}"]`);
+  if (!btn) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> AI generating...';
+
+  try {
+    const res = await fetch(`/api/projects/${state.projectId}/ai-assist/${step}`, {
+      method: 'POST',
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(`⚠️ AI Error: ${err.detail || 'Unknown error'}`, 'error');
+      return;
+    }
+
+    const data = await res.json();
+
+    // Process based on step
+    switch (step) {
+      case 'features': {
+        if (!data.items || !data.items.length) {
+          showToast('⚠️ AI returned no suggestions', 'error');
+          return;
+        }
+        for (const item of data.items) {
+          state.projectData.features.push({
+            name: item.name || '',
+            description: item.description || '',
+            priority: item.priority || 'should',
+          });
+        }
+        renderFeatures();
+        showToast(`✅ ${data.items.length} ${labels[step]} added!`);
+        break;
+      }
+
+      case 'func_reqs': {
+        if (!data.items || !data.items.length) {
+          showToast('⚠️ AI returned no suggestions', 'error');
+          return;
+        }
+        for (const item of data.items) {
+          state.projectData.functional_reqs.push({
+            req_id: item.req_id || 'FR-XXX',
+            title: item.title || '',
+            description: item.description || '',
+            category: item.category || 'general',
+            priority: item.priority || 'medium',
+          });
+        }
+        renderFuncReqs();
+        showToast(`✅ ${data.items.length} ${labels[step]} added!`);
+        break;
+      }
+
+      case 'nfr': {
+        if (!data.items || !data.items.length) {
+          showToast('⚠️ AI returned no suggestions', 'error');
+          return;
+        }
+        for (const item of data.items) {
+          state.projectData.non_functional_reqs.push({
+            category: item.category || 'performance',
+            description: item.description || '',
+            metric: item.metric || '',
+            priority: item.priority || 'medium',
+          });
+        }
+        renderNFRs();
+        showToast(`✅ ${data.items.length} ${labels[step]} added!`);
+        break;
+      }
+
+      case 'data_model': {
+        if (!data.entities || !data.entities.length) {
+          showToast('⚠️ AI returned no entities', 'error');
+          return;
+        }
+        for (const ent of data.entities) {
+          state.projectData.entities.push({
+            name: ent.name || '',
+            description: ent.description || '',
+            attributes: (ent.attributes || []).map(a => ({
+              name: a.name || '',
+              type: a.type || 'string',
+              is_pk: !!a.is_pk,
+              is_fk: !!a.is_fk,
+              nullable: a.nullable !== false,
+              description: a.description || '',
+            })),
+          });
+        }
+        for (const rel of (data.relationships || [])) {
+          state.projectData.relationships.push({
+            source_entity: rel.source_entity || '',
+            target_entity: rel.target_entity || '',
+            relationship_type: rel.relationship_type || 'one-to-many',
+            description: rel.description || '',
+          });
+        }
+        renderEntities();
+        renderRelationships();
+        showToast(`✅ ${data.entities.length} entities + ${(data.relationships || []).length} relationships added!`);
+        break;
+      }
+
+      case 'system_interactions': {
+        if (!data.flows || !data.flows.length) {
+          showToast('⚠️ AI returned no suggestions', 'error');
+          return;
+        }
+        for (const flow of data.flows) {
+          state.projectData.sequence_flows.push({
+            title: flow.title || '',
+            actors: flow.actors || '',
+            steps: flow.steps || '',
+          });
+        }
+        renderFlows();
+        showToast(`✅ ${data.flows.length} ${labels[step]} added!`);
+        break;
+      }
+    }
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> ✨ AI Suggest';
   }
 }
 

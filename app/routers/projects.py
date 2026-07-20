@@ -15,6 +15,7 @@ from app.models import (
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectSummary, ProjectDetail
 from app.services.document_generator import DOC_NAMES, get_doc_filename
 from app.services.background_generator import run_generation
+from app.services.ai_assist import suggest
 
 from datetime import datetime, timezone
 import uuid
@@ -403,6 +404,43 @@ def download_generation(
         media_type="text/markdown",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ─── AI Assist ──────────────────────────────────────────
+
+ASSIST_STEPS = {
+    "features": "Features — membantu mendefine feature dari project info, stakeholder, target user",
+    "func_reqs": "Functional Requirements — membantu mendefine FR dari project info, stakeholder, target user, features",
+    "nfr": "Non-Functional Requirements — membantu mendefine NFR dari standard industri",
+    "data_model": "Data Model — membantu mendefine entity & relationships dari data yang sudah diisi",
+    "system_interactions": "System Interactions — membantu mendefine sequence flow dari data yang sudah diisi",
+}
+
+
+@router.post("/{project_id}/ai-assist/{step}")
+def ai_assist(
+    project_id: str,
+    step: str,
+    session: Session = Depends(get_session),
+):
+    """Generate AI suggestions for a requirement input step."""
+    if step not in ASSIST_STEPS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown assist step: {step}. Choose from {list(ASSIST_STEPS.keys())}",
+        )
+
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    result = suggest(project, step)
+    if result is None:
+        raise HTTPException(status_code=500, detail="AI returned empty response")
+    if "error" in result:
+        raise HTTPException(status_code=502, detail=result["error"])
+
+    return result
 
 
 @router.get("/{project_id}/download-all")
